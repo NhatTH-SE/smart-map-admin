@@ -1,0 +1,37 @@
+import apiClient from './client'
+
+/**
+ * API cho Module 2: Quản lý Trạm phát (Beacon/iTag).
+ */
+export const stationApi = {
+  // Lấy tất cả (cho admin list)
+  getAll: () => apiClient.get('/stations'),
+
+  // Lấy danh sách trạm theo bản đồ
+  getByMap: (mapId) => apiClient.get(`/stations?mapId=${mapId}`),
+
+  // Lọc theo trạng thái
+  getByStatus: (status) => apiClient.get(`/stations?status=${status}`),
+
+  // Tìm theo tên / MAC
+  search: (q) => apiClient.get(`/stations?q=${encodeURIComponent(q)}`),
+
+  // Đếm theo status (cho header summary)
+  getStats: () => apiClient.get('/stations/stats'),
+
+  // Chi tiết
+  getById: (id) => apiClient.get(`/stations/${id}`),
+
+  // Tạo mới
+  create: (payload) => apiClient.post('/stations', payload),
+
+  // Cập nhật
+  update: (id, payload) => apiClient.put(`/stations/${id}`, payload),
+
+  // Đổi trạng thái nhanh
+  updateStatus: (id, status) =>
+    apiClient.patch(`/stations/${id}/status`, { status }),
+
+  // Xóa
+  remove: (id) => apiClient.delete(`/stations/${id}`),
+}
