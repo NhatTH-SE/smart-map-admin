@@ -36,8 +36,27 @@ public interface StationRepository extends JpaRepository<Station, Long> {
 
     Optional<Station> findByMacAddress(String macAddress);
 
+    /**
+     * Tìm theo MAC bao gồm cả row đã soft-delete.
+     * Dùng để validate trùng MAC vì UNIQUE constraint áp dụng cả row deleted —
+     * nếu chỉ check trên row active, người dùng có thể tạo station mới cùng MAC
+     * với station đã xóa mềm → DB sẽ ném UNIQUE violation.
+     */
+    @Query(value = "SELECT * FROM dbo.stations WHERE mac_address = :mac", nativeQuery = true)
+    Optional<Station> findByMacAddressIncludingDeleted(@Param("mac") String macAddress);
+
     long countByMap_IdAndStatus(Long mapId, String status);
 
     /** Đếm theo status (toàn hệ thống) — cho dashboard */
     long countByStatus(String status);
+
+    /** Bao gồm cả station đã soft-delete (admin trash view) */
+    @Query(value = "SELECT * FROM dbo.stations ORDER BY created_at DESC", nativeQuery = true)
+    List<Station> findAllIncludingDeleted();
+
+    @Query(value = "SELECT * FROM dbo.stations WHERE map_id = :mapId ORDER BY created_at DESC", nativeQuery = true)
+    List<Station> findByMap_IdIncludingDeleted(@Param("mapId") Long mapId);
+
+    @Query(value = "SELECT * FROM dbo.stations WHERE id = :id", nativeQuery = true)
+    Optional<Station> findByIdIncludingDeleted(Long id);
 }

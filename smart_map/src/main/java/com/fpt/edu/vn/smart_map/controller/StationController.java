@@ -35,9 +35,12 @@ public class StationController {
     public ApiResponse<List<StationDto.Response>> list(
             @RequestParam(required = false) Long mapId,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String q) {
+            @RequestParam(required = false) String q,
+            @RequestParam(value = "includeDeleted", required = false, defaultValue = "false") boolean includeDeleted) {
         if (mapId != null) {
-            return ApiResponse.ok(stationService.getByMapId(mapId));
+            return ApiResponse.ok(includeDeleted
+                    ? stationService.getByMapIdIncludingDeleted(mapId)
+                    : stationService.getByMapId(mapId));
         }
         if (status != null && !status.isBlank()) {
             return ApiResponse.ok(stationService.getByStatus(status));
@@ -45,7 +48,9 @@ public class StationController {
         if (q != null && !q.isBlank()) {
             return ApiResponse.ok(stationService.search(q));
         }
-        return ApiResponse.ok(stationService.getAll());
+        return ApiResponse.ok(includeDeleted
+                ? stationService.getAllIncludingDeleted()
+                : stationService.getAll());
     }
 
     @GetMapping("/stats")
@@ -77,9 +82,16 @@ public class StationController {
         return ApiResponse.ok(stationService.updateStatus(id, req.getStatus()));
     }
 
+    /** Soft delete — có thể khôi phục qua POST /{id}/restore */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         stationService.delete(id);
-        return ApiResponse.ok(null, "Đã xóa trạm");
+        return ApiResponse.ok(null, "Đã xóa trạm (có thể khôi phục)");
+    }
+
+    /** Khôi phục trạm đã soft-delete */
+    @PostMapping("/{id}/restore")
+    public ApiResponse<StationDto.Response> restore(@PathVariable Long id) {
+        return ApiResponse.ok(stationService.restore(id), "Đã khôi phục trạm");
     }
 }

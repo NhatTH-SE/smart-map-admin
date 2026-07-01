@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -33,6 +34,13 @@ public class StationService {
     }
 
     @Transactional(readOnly = true)
+    public List<StationDto.Response> getByMapIdIncludingDeleted(Long mapId) {
+        return stationRepository.findByMap_IdIncludingDeleted(mapId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<StationDto.Response> getByStatus(String status) {
         return stationRepository.findByStatusOrderByCreatedAtDesc(status).stream()
                 .map(this::toResponse)
@@ -42,6 +50,13 @@ public class StationService {
     @Transactional(readOnly = true)
     public List<StationDto.Response> getAll() {
         return stationRepository.findAllOrderByCreatedAtDesc().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StationDto.Response> getAllIncludingDeleted() {
+        return stationRepository.findAllIncludingDeleted().stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -82,15 +97,17 @@ public class StationService {
         MapEntity map = mapRepository.findById(req.getMapId())
                 .orElseThrow(() -> new ApiException(404, "Không tìm thấy bản đồ với id=" + req.getMapId()));
 
-        // Check trùng MAC
-        if (stationRepository.findByMacAddress(req.getMacAddress()).isPresent()) {
-            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống");
+        // Check trùng MAC — phải bao gồm cả row đã soft-delete vì UNIQUE constraint
+        // áp dụng cho mọi row trong bảng.
+        String normalizedMac = req.getMacAddress().toUpperCase();
+        if (stationRepository.findByMacAddressIncludingDeleted(normalizedMac).isPresent()) {
+            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
         }
 
         Station station = Station.builder()
                 .map(map)
                 .name(req.getName())
-                .macAddress(req.getMacAddress().toUpperCase())
+                .macAddress(normalizedMac)
                 .coordX(req.getCoordX())
                 .coordY(req.getCoordY())
                 .notes(req.getNotes())
@@ -112,14 +129,21 @@ public class StationService {
     public StationDto.Response update(Long id, StationDto.Request req) {
         Station station = getEntityById(id);
 
-        // Nếu đổi MAC thì check trùng
-        if (!station.getMacAddress().equalsIgnoreCase(req.getMacAddress())
-                && stationRepository.findByMacAddress(req.getMacAddress()).isPresent()) {
-            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống");
+        String normalizedMac = req.getMacAddress().toUpperCase();
+
+        // Nếu đổi MAC thì check trùng (bao gồm cả row đã soft-delete).
+        // Bỏ qua chính nó (id khác nhau vẫn OK).
+        if (!station.getMacAddress().equalsIgnoreCase(normalizedMac)) {
+            stationRepository.findByMacAddressIncludingDeleted(normalizedMac)
+                    .ifPresent(existing -> {
+                        if (!existing.getId().equals(id)) {
+                            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
+                        }
+                    });
         }
 
         station.setName(req.getName());
-        station.setMacAddress(req.getMacAddress().toUpperCase());
+        station.setMacAddress(normalizedMac);
         station.setCoordX(req.getCoordX());
         station.setCoordY(req.getCoordY());
         station.setNotes(req.getNotes());
@@ -138,14 +162,30 @@ public class StationService {
     }
 
     // =========================================================================
-    // DELETE
+    // DELETE / RESTORE (soft delete)
     // =========================================================================
 
+    /** Soft delete: chỉ set deletedAt, không xóa row. */
     @Transactional
     public void delete(Long id) {
-        Station station = getEntityById(id);
-        stationRepository.delete(station);
-        log.info("Deleted station id={}", id);
+        Station station = getEntityById(id); // đã filter deleted_at IS NULL
+        station.setDeletedAt(Instant.now());
+        stationRepository.save(station);
+        log.info("Soft-deleted station id={}", id);
+    }
+
+    /** Khôi phục station đã soft-delete. */
+    @Transactional
+    public StationDto.Response restore(Long id) {
+        Station station = stationRepository.findByIdIncludingDeleted(id)
+                .orElseThrow(() -> new ApiException(404, "Không tìm thấy trạm với id=" + id));
+        if (station.getDeletedAt() == null) {
+            throw new ApiException(409, "Trạm chưa bị xóa");
+        }
+        station.setDeletedAt(null);
+        Station saved = stationRepository.save(station);
+        log.info("Restored station id={}", id);
+        return toResponse(saved);
     }
 
     // =========================================================================
@@ -166,6 +206,7 @@ public class StationService {
                 .lastSeenAt(s.getLastSeenAt())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
+                .deletedAt(s.getDeletedAt())
                 .build();
     }
 }

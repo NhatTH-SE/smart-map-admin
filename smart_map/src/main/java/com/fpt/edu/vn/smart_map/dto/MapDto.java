@@ -58,5 +58,7 @@ public class MapDto {
         private String notes;
         private Instant createdAt;
         private Instant updatedAt;
+        /** NULL = đang hoạt động; có giá trị = đã soft-delete (có thể khôi phục) */
+        private Instant deletedAt;
     }
 }
