@@ -6,6 +6,7 @@ import { stationApi } from '../api/stationApi'
 import { resolveImageUrl } from '../api/imageUrl'
 import StationModal from '../components/StationModal'
 import ConfirmModal from '../components/ConfirmModal'
+import RestoreRow from '../components/RestoreRow'
 import ExportCodeModal from '../components/ExportCodeModal'
 
 const STATUS_COLOR = {
@@ -180,7 +181,7 @@ export default function MapEditorPage() {
     try {
       await stationApi.remove(target.id)
       await loadAll()
-      toast.success(`Đã xóa "${target.name}" (có thể khôi phục)`)
+      toast.success(`Đã xóa "${target.name}" — khôi phục trong 30s`)
     } catch (err) {
       toast.error('Xóa thất bại: ' + err.message)
     }
@@ -352,26 +353,13 @@ export default function MapEditorPage() {
               </div>
               <ul className="divide-y divide-amber-300/40">
                 {visibleDeletedStations.map((s) => (
-                  <li key={s.id} className="flex items-center gap-2 px-4 py-2 text-xs">
-                    <div
-                      className="w-2 h-2 mt-1.5 shrink-0"
-                      style={{ backgroundColor: STATUS_COLOR[s.status] || '#94a3b8' }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-text truncate">{s.name}</div>
-                      <div className="text-[10px] text-text-soft font-mono">
-                        {new Date(s.deletedAt).toLocaleString('vi-VN')}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleRestoreStation(s)}
-                      disabled={restoringStationId === s.id}
-                      className="text-[10px] font-semibold tracking-widest uppercase text-accent-500 hover:text-accent-700 px-2 py-1 border border-accent-500/40 hover:bg-accent-500/10 disabled:opacity-50 shrink-0"
-                      title="Khôi phục"
-                    >
-                      {restoringStationId === s.id ? '...' : 'Khôi phục'}
-                    </button>
-                  </li>
+                  <RestoreRow
+                    key={s.id}
+                    item={s}
+                    meta={`Xóa lúc ${new Date(s.deletedAt).toLocaleTimeString('vi-VN')}`}
+                    isRestoring={restoringStationId === s.id}
+                    onRestore={handleRestoreStation}
+                  />
                 ))}
               </ul>
               {!showDeletedStations && deletedStations.length > 3 && (
@@ -472,7 +460,7 @@ export default function MapEditorPage() {
         onClose={() => setPendingDeleteStation(null)}
         onConfirm={handleDeleteStation}
         title="Xóa trạm"
-        message={`"${pendingDeleteStation?.name}" sẽ được ẩn khỏi bản đồ. Có thể khôi phục từ dải "Đã xóa" phía trên.`}
+        message={`"${pendingDeleteStation?.name}" sẽ được ẩn khỏi bản đồ. Có thể khôi phục trong vòng 30 giây từ dải "Đã xóa" phía trên.`}
         confirmText="Xóa"
         cancelText="Hủy"
         tone="danger"

@@ -5,6 +5,7 @@ import { mapApi } from '../api/mapApi'
 import { resolveImageUrl } from '../api/imageUrl'
 import UploadMapModal from '../components/UploadMapModal'
 import ConfirmModal from '../components/ConfirmModal'
+import RestoreRow from '../components/RestoreRow'
 
 export default function MapsPage() {
   const navigate = useNavigate()
@@ -48,7 +49,7 @@ export default function MapsPage() {
       await mapApi.remove(target.id)
       // Reload toàn bộ để cập nhật deletedAt
       await load()
-      toast.success(`Đã xóa "${target.name}" (có thể khôi phục)`)
+      toast.success(`Đã xóa "${target.name}" — khôi phục trong 30s`)
     } catch (err) {
       toast.error('Xóa thất bại: ' + (err.message || 'lỗi không xác định'))
     }
@@ -152,25 +153,14 @@ export default function MapsPage() {
               </div>
               <ul className="divide-y divide-amber-300/40">
                 {visibleDeleted.map((m) => (
-                  <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <div
-                      className="w-10 h-10 bg-bg-raised border border-border shrink-0 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${resolveImageUrl(m.imageUrl)})` }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-text truncate">{m.name}</div>
-                      <div className="text-[11px] text-text-soft font-mono">
-                        ID #{m.id} · Xóa lúc {new Date(m.deletedAt).toLocaleString('vi-VN')}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleRestore(m)}
-                      disabled={restoringId === m.id}
-                      className="btn-primary py-1.5 px-4 text-xs disabled:opacity-50"
-                    >
-                      {restoringId === m.id ? 'Đang khôi phục...' : 'Khôi phục'}
-                    </button>
-                  </li>
+                  <RestoreRow
+                    key={m.id}
+                    item={m}
+                    primary={resolveImageUrl(m.imageUrl)}
+                    meta={`ID #${m.id} · Xóa lúc ${new Date(m.deletedAt).toLocaleTimeString('vi-VN')}`}
+                    isRestoring={restoringId === m.id}
+                    onRestore={handleRestore}
+                  />
                 ))}
               </ul>
               {!showDeleted && deletedMaps.length > 3 && (
@@ -253,7 +243,7 @@ export default function MapsPage() {
         onClose={cancelDelete}
         onConfirm={handleDelete}
         title="Xóa bản đồ"
-        message={`"${pendingDelete?.name}" sẽ được ẩn khỏi hệ thống. Có thể khôi phục lại từ dải "Đã xóa gần đây" phía trên.`}
+        message={`"${pendingDelete?.name}" sẽ được ẩn khỏi hệ thống. Có thể khôi phục trong vòng 30 giây từ dải "Đã xóa gần đây" phía trên.`}
         confirmText="Xóa"
         cancelText="Hủy"
         tone="danger"
