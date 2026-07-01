@@ -35,3 +35,6 @@ build/
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+
+# Uploaded map images (do người dùng upload lên server, sinh ra trong runtime)
+uploads/
