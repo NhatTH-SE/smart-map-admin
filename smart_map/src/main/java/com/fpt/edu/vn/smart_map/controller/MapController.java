@@ -30,8 +30,9 @@ public class MapController {
     private final MapService mapService;
 
     @GetMapping
-    public ApiResponse<List<MapDto.Response>> getAll() {
-        return ApiResponse.ok(mapService.getAll());
+    public ApiResponse<List<MapDto.Response>> getAll(
+            @RequestParam(value = "includeDeleted", required = false, defaultValue = "false") boolean includeDeleted) {
+        return ApiResponse.ok(includeDeleted ? mapService.getAllIncludingDeleted() : mapService.getAll());
     }
 
     @GetMapping("/active")
@@ -67,9 +68,16 @@ public class MapController {
         return ApiResponse.ok(mapService.updateImage(id, file));
     }
 
+    /** Soft delete — có thể khôi phục qua POST /{id}/restore */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         mapService.delete(id);
-        return ApiResponse.ok(null, "Đã xóa bản đồ");
+        return ApiResponse.ok(null, "Đã xóa bản đồ (có thể khôi phục)");
+    }
+
+    /** Khôi phục bản đồ đã soft-delete */
+    @PostMapping("/{id}/restore")
+    public ApiResponse<MapDto.Response> restore(@PathVariable Long id) {
+        return ApiResponse.ok(mapService.restore(id), "Đã khôi phục bản đồ");
     }
 }

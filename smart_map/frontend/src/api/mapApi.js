@@ -5,8 +5,11 @@ import apiClient, { rawClient } from './client'
  * Mỗi hàm trả về Promise resolve với data (đã unwrap ApiResponse).
  */
 export const mapApi = {
-  // Lấy danh sách tất cả
+  // Lấy danh sách tất cả (ẩn record đã soft-delete)
   getAll: () => apiClient.get('/maps'),
+
+  // Lấy danh sách bao gồm cả record đã soft-delete (admin trash view)
+  getAllIncludingDeleted: () => apiClient.get('/maps?includeDeleted=true'),
 
   // Lấy danh sách đang active
   getActive: () => apiClient.get('/maps/active'),
@@ -53,6 +56,9 @@ export const mapApi = {
     }
   },
 
-  // Xóa
+  // Xóa (soft delete — có thể khôi phục)
   remove: (id) => apiClient.delete(`/maps/${id}`),
+
+  // Khôi phục bản đồ đã soft-delete
+  restore: (id) => apiClient.post(`/maps/${id}/restore`),
 }

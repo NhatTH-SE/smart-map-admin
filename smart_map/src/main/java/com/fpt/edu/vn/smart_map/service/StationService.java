@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -33,6 +34,13 @@ public class StationService {
     }
 
     @Transactional(readOnly = true)
+    public List<StationDto.Response> getByMapIdIncludingDeleted(Long mapId) {
+        return stationRepository.findByMap_IdIncludingDeleted(mapId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<StationDto.Response> getByStatus(String status) {
         return stationRepository.findByStatusOrderByCreatedAtDesc(status).stream()
                 .map(this::toResponse)
@@ -42,6 +50,13 @@ public class StationService {
     @Transactional(readOnly = true)
     public List<StationDto.Response> getAll() {
         return stationRepository.findAllOrderByCreatedAtDesc().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StationDto.Response> getAllIncludingDeleted() {
+        return stationRepository.findAllIncludingDeleted().stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -138,14 +153,30 @@ public class StationService {
     }
 
     // =========================================================================
-    // DELETE
+    // DELETE / RESTORE (soft delete)
     // =========================================================================
 
+    /** Soft delete: chỉ set deletedAt, không xóa row. */
     @Transactional
     public void delete(Long id) {
-        Station station = getEntityById(id);
-        stationRepository.delete(station);
-        log.info("Deleted station id={}", id);
+        Station station = getEntityById(id); // đã filter deleted_at IS NULL
+        station.setDeletedAt(Instant.now());
+        stationRepository.save(station);
+        log.info("Soft-deleted station id={}", id);
+    }
+
+    /** Khôi phục station đã soft-delete. */
+    @Transactional
+    public StationDto.Response restore(Long id) {
+        Station station = stationRepository.findByIdIncludingDeleted(id)
+                .orElseThrow(() -> new ApiException(404, "Không tìm thấy trạm với id=" + id));
+        if (station.getDeletedAt() == null) {
+            throw new ApiException(409, "Trạm chưa bị xóa");
+        }
+        station.setDeletedAt(null);
+        Station saved = stationRepository.save(station);
+        log.info("Restored station id={}", id);
+        return toResponse(saved);
     }
 
     // =========================================================================
@@ -166,6 +197,7 @@ public class StationService {
                 .lastSeenAt(s.getLastSeenAt())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
+                .deletedAt(s.getDeletedAt())
                 .build();
     }
 }

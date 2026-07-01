@@ -40,4 +40,14 @@ public interface StationRepository extends JpaRepository<Station, Long> {
 
     /** Đếm theo status (toàn hệ thống) — cho dashboard */
     long countByStatus(String status);
+
+    /** Bao gồm cả station đã soft-delete (admin trash view) */
+    @Query(value = "SELECT * FROM dbo.stations ORDER BY created_at DESC", nativeQuery = true)
+    List<Station> findAllIncludingDeleted();
+
+    @Query(value = "SELECT * FROM dbo.stations WHERE map_id = :mapId ORDER BY created_at DESC", nativeQuery = true)
+    List<Station> findByMap_IdIncludingDeleted(@Param("mapId") Long mapId);
+
+    @Query(value = "SELECT * FROM dbo.stations WHERE id = :id", nativeQuery = true)
+    Optional<Station> findByIdIncludingDeleted(Long id);
 }

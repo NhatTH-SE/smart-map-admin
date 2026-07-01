@@ -3,6 +3,7 @@ package com.fpt.edu.vn.smart_map.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "maps", schema = "dbo")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -58,4 +60,8 @@ public class MapEntity {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /** Soft delete: NULL = đang hoạt động, có giá trị = đã xóa (có thể khôi phục) */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }

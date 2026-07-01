@@ -32,6 +32,8 @@ export default function MapEditorPage() {
   const [pendingCoord, setPendingCoord] = useState(null)
   const [editingStation, setEditingStation] = useState(null)
   const [deletingStation, setDeletingStation] = useState(null)
+  const [restoringStationId, setRestoringStationId] = useState(null)
+  const [showDeletedStations, setShowDeletedStations] = useState(false)
   const [showExportCode, setShowExportCode] = useState(false)
   const [draggingId, setDraggingId] = useState(null)
   const isDragging = useRef(false)
@@ -43,14 +45,16 @@ export default function MapEditorPage() {
     try {
       const mapData = await mapApi.getById(id)
       setMap(mapData)
-      const stationData = await stationApi.getByMap(id)
+      const stationData = showDeletedStations
+        ? await stationApi.getByMapIncludingDeleted(id)
+        : await stationApi.getByMap(id)
       setStations(stationData || [])
     } catch (err) {
       toast.error(err.message || 'Lỗi tải dữ liệu')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showDeletedStations])
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { if (id) loadAll() }, [id, loadAll])
@@ -165,10 +169,27 @@ export default function MapEditorPage() {
     setDeletingStation(null) // đóng modal ngay, không đợi request
     try {
       await stationApi.remove(s.id)
-      setStations((prev) => prev.filter((x) => x.id !== s.id))
-      toast.success(`Đã xóa "${s.name}"`)
+      if (showDeletedStations) {
+        loadAll()
+      } else {
+        setStations((prev) => prev.filter((x) => x.id !== s.id))
+      }
+      toast.success(`Đã xóa "${s.name}" (có thể khôi phục)`)
     } catch (err) {
       toast.error('Xóa thất bại: ' + err.message)
+    }
+  }
+
+  const handleRestoreStation = async (s) => {
+    setRestoringStationId(s.id)
+    try {
+      await stationApi.restore(s.id)
+      toast.success(`Đã khôi phục "${s.name}"`)
+      loadAll()
+    } catch (err) {
+      toast.error('Khôi phục thất bại: ' + err.message)
+    } finally {
+      setRestoringStationId(null)
     }
   }
 
@@ -255,6 +276,7 @@ export default function MapEditorPage() {
                 className="absolute inset-0 w-full h-full select-none pointer-events-none"
               />
               {stations.map((s) => {
+                if (s.deletedAt && !showDeletedStations) return null
                 const x = s._displayX !== undefined ? s._displayX : s.coordX
                 const y = s._displayY !== undefined ? s._displayY : s.coordY
                 const isDraggingThis = draggingId === s.id
@@ -266,6 +288,7 @@ export default function MapEditorPage() {
                       position: 'absolute', left: x, top: y,
                       transform: 'translate(-50%, -50%)',
                       zIndex: isDraggingThis ? 20 : 10,
+                      opacity: s.deletedAt ? 0.35 : 1,
                     }}
                   >
                     <div
@@ -278,7 +301,7 @@ export default function MapEditorPage() {
                         backgroundColor: 'var(--text-inverted)',
                         border: `2px solid #94a3b8`,
                       }}
-                      title={s.name}
+                      title={s.name + (s.deletedAt ? ' (đã xóa)' : '')}
                     />
                   </div>
                 )
@@ -297,12 +320,30 @@ export default function MapEditorPage() {
             <span className="text-xs font-mono text-text-soft bg-bg-raised px-2 py-1">{stations.length}</span>
           </div>
 
+          {/* Toggle hiện trạm đã xóa */}
+          <div className="px-5 py-2.5 border-b border-border bg-bg-raised flex items-center justify-between">
+            <label className="flex items-center gap-2 text-xs text-text-soft cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showDeletedStations}
+                onChange={(e) => setShowDeletedStations(e.target.checked)}
+                className="w-4 h-4 accent-accent-500 cursor-pointer"
+              />
+              Hiện cả trạm đã xóa
+            </label>
+            {showDeletedStations && (
+              <span className="text-[10px] font-mono text-amber-600">
+                {stations.filter((s) => s.deletedAt).length} đã xóa
+              </span>
+            )}
+          </div>
+
           {/* Status legend */}
           <div className="px-5 py-3 border-b border-border">
             <p className="text-[10px] font-semibold tracking-widest uppercase text-text-soft mb-2">Trạng thái</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(STATUS_LABEL).map(([k, label]) => {
-                const count = stations.filter((s) => s.status === k).length
+                const count = stations.filter((s) => !s.deletedAt && s.status === k).length
                 return (
                   <div key={k} className="flex items-center gap-1.5 text-xs text-text-soft">
                     <span className="w-2 h-2" style={{ backgroundColor: STATUS_COLOR[k] }} />
@@ -321,32 +362,56 @@ export default function MapEditorPage() {
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {stations.map((s) => (
-                <li
-                  key={s.id}
-                  className="p-4 hover:bg-bg-raised cursor-pointer transition-colors group"
-                  onClick={() => setEditingStation(s)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-2.5 h-2.5 mt-1.5 shrink-0"
-                      style={{ backgroundColor: STATUS_COLOR[s.status] || '#94a3b8' }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-text truncate">{s.name}</div>
-                      <div className="text-xs text-text-soft font-mono truncate mt-0.5">{s.macAddress}</div>
-                      <div className="text-[10px] text-text-muted mt-1 font-mono uppercase tracking-wider">
-                        ({Math.round(s.coordX)}, {Math.round(s.coordY)}) · {STATUS_LABEL[s.status]}
+              {stations.map((s) => {
+                const isDeleted = !!s.deletedAt
+                if (isDeleted && !showDeletedStations) return null
+                return (
+                  <li
+                    key={s.id}
+                    className={`p-4 transition-colors group ${
+                      isDeleted ? 'opacity-60 bg-bg-raised' : 'hover:bg-bg-raised cursor-pointer'
+                    }`}
+                    onClick={() => { if (!isDeleted) setEditingStation(s) }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-2.5 h-2.5 mt-1.5 shrink-0"
+                        style={{ backgroundColor: STATUS_COLOR[s.status] || '#94a3b8' }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <div className="font-medium text-sm text-text truncate flex-1">{s.name}</div>
+                          {isDeleted && (
+                            <span className="text-[9px] font-semibold tracking-widest uppercase text-amber-600 bg-amber-500/15 px-1.5 py-0.5 shrink-0">
+                              Đã xóa
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-text-soft font-mono truncate mt-0.5">{s.macAddress}</div>
+                        <div className="text-[10px] text-text-muted mt-1 font-mono uppercase tracking-wider">
+                          ({Math.round(s.coordX)}, {Math.round(s.coordY)}) · {STATUS_LABEL[s.status]}
+                        </div>
                       </div>
+                      {isDeleted ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRestoreStation(s) }}
+                          disabled={restoringStationId === s.id}
+                          className="text-[10px] font-semibold tracking-widest uppercase text-accent-500 hover:text-accent-700 px-2 py-1 border border-accent-500/40 hover:bg-accent-500/10 disabled:opacity-50 shrink-0"
+                          title="Khôi phục trạm"
+                        >
+                          {restoringStationId === s.id ? '...' : 'Khôi phục'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeletingStation(s) }}
+                          className="text-text-muted hover:text-red-600 text-lg leading-none shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center hover:bg-border"
+                          title="Xóa trạm"
+                        >×</button>
+                      )}
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeletingStation(s) }}
-                      className="text-text-muted hover:text-red-600 text-lg leading-none shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center hover:bg-border"
-                      title="Xóa trạm"
-                    >×</button>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </aside>
@@ -379,7 +444,7 @@ export default function MapEditorPage() {
         onClose={() => setDeletingStation(null)}
         onConfirm={handleDeleteStation}
         title="Xóa trạm"
-        message={`Bạn có chắc muốn xóa trạm "${deletingStation?.name}"? Hành động không thể hoàn tác.`}
+        message={`"${deletingStation?.name}" sẽ được ẩn khỏi hệ thống. Có thể khôi phục từ "Hiện cả trạm đã xóa".`}
         confirmText="Xóa"
         cancelText="Hủy"
         tone="danger"

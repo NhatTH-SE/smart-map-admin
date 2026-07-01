@@ -13,18 +13,22 @@ export default function MapsPage() {
   const [openUpload, setOpenUpload] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [deletingName, setDeletingName] = useState('')
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [restoringId, setRestoringId] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await mapApi.getAll()
+      const data = showDeleted
+        ? await mapApi.getAllIncludingDeleted()
+        : await mapApi.getAll()
       setMaps(data || [])
     } catch (err) {
       toast.error(err.message || 'Không tải được danh sách')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showDeleted])
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { load() }, [load])
@@ -38,16 +42,36 @@ export default function MapsPage() {
   const handleDelete = async () => {
     const id = deletingId
     const name = deletingName
-    setDeletingId(null) // đóng modal ngay
+    setDeletingId(null)
     setDeletingName('')
     try {
       await mapApi.remove(id)
-      setMaps((prev) => prev.filter((m) => m.id !== id))
-      toast.success(`Đã xóa "${name}"`)
+      if (showDeleted) {
+        // Đang hiện cả deleted: refresh để cập nhật flag
+        load()
+      } else {
+        setMaps((prev) => prev.filter((m) => m.id !== id))
+      }
+      toast.success(`Đã xóa "${name}" (có thể khôi phục)`)
     } catch (err) {
       toast.error('Xóa thất bại: ' + (err.message || 'lỗi không xác định'))
     }
   }
+
+  const handleRestore = async (m) => {
+    setRestoringId(m.id)
+    try {
+      await mapApi.restore(m.id)
+      toast.success(`Đã khôi phục "${m.name}"`)
+      load()
+    } catch (err) {
+      toast.error('Khôi phục thất bại: ' + (err.message || 'lỗi không xác định'))
+    } finally {
+      setRestoringId(null)
+    }
+  }
+
+  const deletedCount = maps.filter((m) => m.deletedAt).length
 
   return (
     <div className="p-8 max-w-7xl">
@@ -72,7 +96,21 @@ export default function MapsPage() {
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-text-soft">
           Tổng cộng <span className="text-text font-mono">{maps.length}</span> bản đồ
+          {showDeleted && deletedCount > 0 && (
+            <span className="ml-2 text-amber-600">
+              (đã xóa: <span className="font-mono">{deletedCount}</span>)
+            </span>
+          )}
         </p>
+        <label className="flex items-center gap-2 text-xs text-text-soft cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={(e) => setShowDeleted(e.target.checked)}
+            className="w-4 h-4 accent-accent-500 cursor-pointer"
+          />
+          Hiện cả bản đồ đã xóa
+        </label>
       </div>
 
       {/* Content */}
@@ -96,50 +134,71 @@ export default function MapsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {maps.map((m) => (
-            <div
-              key={m.id}
-              className="bg-bg-soft border border-border hover:border-border-strong transition-colors group"
-            >
-              <div className="aspect-video bg-bg-raised flex items-center justify-center overflow-hidden border-b border-border">
-                <img
-                  src={resolveImageUrl(m.imageUrl)}
-                  alt={m.name}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <h3 className="font-semibold text-text truncate flex-1">{m.name}</h3>
-                  {m.isActive ? (
-                    <span className="badge-active">Active</span>
-                  ) : (
-                    <span className="badge-inactive">Inactive</span>
+          {maps.map((m) => {
+            const isDeleted = !!m.deletedAt
+            return (
+              <div
+                key={m.id}
+                className={`bg-bg-soft border transition-colors group ${
+                  isDeleted
+                    ? 'border-amber-300 opacity-60 grayscale'
+                    : 'border-border hover:border-border-strong'
+                }`}
+              >
+                <div className="aspect-video bg-bg-raised flex items-center justify-center overflow-hidden border-b border-border">
+                  <img
+                    src={resolveImageUrl(m.imageUrl)}
+                    alt={m.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <h3 className="font-semibold text-text truncate flex-1">{m.name}</h3>
+                    {isDeleted ? (
+                      <span className="badge-inactive">Đã xóa</span>
+                    ) : m.isActive ? (
+                      <span className="badge-active">Active</span>
+                    ) : (
+                      <span className="badge-inactive">Inactive</span>
+                    )}
+                  </div>
+                  {m.description && (
+                    <p className="text-sm text-text-soft mt-1.5 line-clamp-2">{m.description}</p>
                   )}
-                </div>
-                {m.description && (
-                  <p className="text-sm text-text-soft mt-1.5 line-clamp-2">{m.description}</p>
-                )}
-                <div className="text-[11px] text-text-soft mt-2 font-mono uppercase tracking-wider">
-                  {m.width} × {m.height} px
-                </div>
-                <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-                  <button
-                    onClick={() => navigate(`/admin/maps/${m.id}/edit`)}
-                    className="flex-1 btn-primary py-1.5"
-                  >
-                    Mở Editor
-                  </button>
-                  <button
-                    onClick={() => askDelete(m)}
-                    className="px-3 py-1.5 text-xs font-medium text-red-600 bg-danger-soft/10 border border-danger-soft hover:bg-danger hover:text-white transition-colors"
-                  >
-                    Xóa
-                  </button>
+                  <div className="text-[11px] text-text-soft mt-2 font-mono uppercase tracking-wider">
+                    {m.width} × {m.height} px
+                  </div>
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                    {isDeleted ? (
+                      <button
+                        onClick={() => handleRestore(m)}
+                        disabled={restoringId === m.id}
+                        className="flex-1 btn-primary py-1.5 disabled:opacity-50"
+                      >
+                        {restoringId === m.id ? 'Đang khôi phục...' : 'Khôi phục'}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => navigate(`/admin/maps/${m.id}/edit`)}
+                          className="flex-1 btn-primary py-1.5"
+                        >
+                          Mở Editor
+                        </button>
+                        <button
+                          onClick={() => askDelete(m)}
+                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-danger-soft/10 border border-danger-soft hover:bg-danger hover:text-white transition-colors"
+                        >
+                          Xóa
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -154,7 +213,7 @@ export default function MapsPage() {
         onClose={() => { setDeletingId(null); setDeletingName('') }}
         onConfirm={handleDelete}
         title="Xóa bản đồ"
-        message={`Hành động này sẽ xóa vĩnh viễn "${deletingName}" và toàn bộ trạm trên đó. Không thể hoàn tác.`}
+        message={`"${deletingName}" sẽ được ẩn khỏi hệ thống. Có thể khôi phục lại từ danh sách "Đã xóa".`}
         confirmText="Xóa"
         cancelText="Hủy"
         tone="danger"

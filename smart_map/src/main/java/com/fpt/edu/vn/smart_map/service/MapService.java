@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,6 +49,12 @@ public class MapService {
 
     public List<MapDto.Response> getAll() {
         return mapRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<MapDto.Response> getAllIncludingDeleted() {
+        return mapRepository.findAllIncludingDeleted().stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -136,15 +143,30 @@ public class MapService {
     }
 
     // =========================================================================
-    // DELETE
+    // DELETE / RESTORE  (soft delete)
     // =========================================================================
 
+    /** Soft delete: chỉ set deletedAt, KHÔNG xóa row và KHÔNG xóa file ảnh. */
     @Transactional
     public void delete(Long id) {
-        MapEntity entity = getEntityById(id);
-        deletePhysicalFile(entity.getImageUrl());
-        mapRepository.delete(entity);
-        log.info("Deleted map id={}", id);
+        MapEntity entity = getEntityById(id); // đã filter deleted_at IS NULL
+        entity.setDeletedAt(Instant.now());
+        mapRepository.save(entity);
+        log.info("Soft-deleted map id={}", id);
+    }
+
+    /** Khôi phục map đã soft-delete. */
+    @Transactional
+    public MapDto.Response restore(Long id) {
+        MapEntity entity = mapRepository.findByIdIncludingDeleted(id)
+                .orElseThrow(() -> new ApiException(404, "Không tìm thấy bản đồ với id=" + id));
+        if (entity.getDeletedAt() == null) {
+            throw new ApiException(409, "Bản đồ chưa bị xóa");
+        }
+        entity.setDeletedAt(null);
+        MapEntity saved = mapRepository.save(entity);
+        log.info("Restored map id={}", id);
+        return toResponse(saved);
     }
 
     // =========================================================================
@@ -226,6 +248,7 @@ public class MapService {
                 .notes(e.getNotes())
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
+                .deletedAt(e.getDeletedAt())
                 .build();
     }
 
