@@ -6,6 +6,9 @@ import { resolveImageUrl } from '../api/imageUrl'
 import UploadMapModal from '../components/UploadMapModal'
 import ConfirmModal from '../components/ConfirmModal'
 import RestoreRow from '../components/RestoreRow'
+import { useNowTick } from '../hooks/useNowTick'
+
+const RESTORE_WINDOW_SEC = 30
 
 export default function MapsPage() {
   const navigate = useNavigate()
@@ -69,12 +72,17 @@ export default function MapsPage() {
   }
 
   const activeMaps = useMemo(() => maps.filter((m) => !m.deletedAt), [maps])
-  const deletedMaps = useMemo(
-    () => maps
-      .filter((m) => m.deletedAt)
-      .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt)),
-    [maps]
-  )
+
+  // Tick mỗi giây để re-render khi countdown chạm 0 → item biến mất khỏi UI.
+  // (Hook này chỉ để trigger re-render, giá trị trả về không dùng trực tiếp.)
+  const now = useNowTick(1000)
+
+  const deletedMaps = useMemo(() => {
+    const cutoff = now - RESTORE_WINDOW_SEC * 1000
+    return maps
+      .filter((m) => m.deletedAt && new Date(m.deletedAt).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt))
+  }, [maps, now])
   const visibleDeleted = showDeleted ? deletedMaps : deletedMaps.slice(0, 3)
 
   return (
@@ -160,6 +168,7 @@ export default function MapsPage() {
                     meta={`ID #${m.id} · Xóa lúc ${new Date(m.deletedAt).toLocaleTimeString('vi-VN')}`}
                     isRestoring={restoringId === m.id}
                     onRestore={handleRestore}
+                    windowSeconds={RESTORE_WINDOW_SEC}
                   />
                 ))}
               </ul>

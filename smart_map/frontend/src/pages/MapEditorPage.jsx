@@ -8,6 +8,7 @@ import StationModal from '../components/StationModal'
 import ConfirmModal from '../components/ConfirmModal'
 import RestoreRow from '../components/RestoreRow'
 import ExportCodeModal from '../components/ExportCodeModal'
+import { useNowTick } from '../hooks/useNowTick'
 
 const STATUS_COLOR = {
   ACTIVE: '#10b981',
@@ -62,12 +63,16 @@ export default function MapEditorPage() {
 
   // Phải đặt trước early-return để không vi phạm Rules of Hooks
   const activeStations = useMemo(() => stations.filter((s) => !s.deletedAt), [stations])
-  const deletedStations = useMemo(
-    () => stations
-      .filter((s) => s.deletedAt)
-      .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt)),
-    [stations]
-  )
+
+  // Tick mỗi giây để re-render khi countdown chạm 0 → station biến mất khỏi UI
+  const now = useNowTick(1000)
+
+  const deletedStations = useMemo(() => {
+    const cutoff = now - 30 * 1000
+    return stations
+      .filter((s) => s.deletedAt && new Date(s.deletedAt).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt))
+  }, [stations, now])
   const visibleDeletedStations = showDeletedStations ? deletedStations : deletedStations.slice(0, 3)
 
   const handleCanvasClick = (e) => {
