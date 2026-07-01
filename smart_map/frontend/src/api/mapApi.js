@@ -1,4 +1,4 @@
-import apiClient from './client'
+import apiClient, { rawClient } from './client'
 
 /**
  * API cho Module 1: Quản lý Bản đồ.
@@ -35,6 +35,22 @@ export const mapApi = {
     return apiClient.patch(`/maps/${id}/image`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+  },
+
+  /**
+   * Module 6: Sinh cấu hình C++ cho ESP32.
+   * Dùng rawClient (không qua interceptor) vì response là text/plain, không phải JSON envelope.
+   * Trả về { text, filename, stationCount }.
+   */
+  exportCpp: async (id) => {
+    const res = await rawClient.get(`/code/maps/${id}`, { responseType: 'text' })
+    const dispo = res.headers?.['content-disposition'] || ''
+    const match = /filename="?([^";]+)"?/.exec(dispo)
+    return {
+      text: res.data,
+      filename: match?.[1] || `map_${id}_stations.cpp`,
+      stationCount: Number(res.headers?.['x-station-count'] || 0),
+    }
   },
 
   // Xóa

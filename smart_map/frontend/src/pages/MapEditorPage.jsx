@@ -6,6 +6,7 @@ import { stationApi } from '../api/stationApi'
 import { resolveImageUrl } from '../api/imageUrl'
 import StationModal from '../components/StationModal'
 import ConfirmModal from '../components/ConfirmModal'
+import ExportCodeModal from '../components/ExportCodeModal'
 
 const STATUS_COLOR = {
   ACTIVE: '#10b981',
@@ -31,6 +32,7 @@ export default function MapEditorPage() {
   const [pendingCoord, setPendingCoord] = useState(null)
   const [editingStation, setEditingStation] = useState(null)
   const [deletingStation, setDeletingStation] = useState(null)
+  const [showExportCode, setShowExportCode] = useState(false)
   const [draggingId, setDraggingId] = useState(null)
   const isDragging = useRef(false)
   const canvasRef = useRef(null)
@@ -215,6 +217,19 @@ export default function MapEditorPage() {
           <span className="text-[10px] text-text-soft font-mono uppercase tracking-widest px-2 py-1 border border-border-strong">
             {canvasW} × {canvasH}
           </span>
+          <button
+            onClick={() => setShowExportCode(true)}
+            className="ml-2 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold tracking-wider uppercase
+                       bg-accent-900/20 text-accent-500 border border-accent-500/40
+                       hover:bg-accent-500 hover:text-text-inverted hover:border-accent-500 transition-colors"
+            title="Sinh code C++ cho ESP32"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Export C++
+          </button>
         </div>
       </div>
 
@@ -368,6 +383,13 @@ export default function MapEditorPage() {
         confirmText="Xóa"
         cancelText="Hủy"
         tone="danger"
+      />
+
+      <ExportCodeModal
+        open={showExportCode}
+        onClose={() => setShowExportCode(false)}
+        mapId={Number(id)}
+        mapName={map?.name}
       />
     </div>
   )
