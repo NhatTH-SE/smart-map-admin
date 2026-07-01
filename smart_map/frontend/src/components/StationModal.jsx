@@ -63,6 +63,14 @@ export default function StationModal({
   }, [open, isEdit, station, mapId, coordX, coordY])
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Auto-clear error khi user gõ lại MAC/Name (để error cũ không "ám" form)
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (error) setError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [macAddress, name])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && open && !submitting) onClose?.() }
     window.addEventListener('keydown', onKey)

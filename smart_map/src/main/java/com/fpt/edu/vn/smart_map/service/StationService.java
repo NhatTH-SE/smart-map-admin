@@ -97,15 +97,17 @@ public class StationService {
         MapEntity map = mapRepository.findById(req.getMapId())
                 .orElseThrow(() -> new ApiException(404, "Không tìm thấy bản đồ với id=" + req.getMapId()));
 
-        // Check trùng MAC
-        if (stationRepository.findByMacAddress(req.getMacAddress()).isPresent()) {
-            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống");
+        // Check trùng MAC — phải bao gồm cả row đã soft-delete vì UNIQUE constraint
+        // áp dụng cho mọi row trong bảng.
+        String normalizedMac = req.getMacAddress().toUpperCase();
+        if (stationRepository.findByMacAddressIncludingDeleted(normalizedMac).isPresent()) {
+            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
         }
 
         Station station = Station.builder()
                 .map(map)
                 .name(req.getName())
-                .macAddress(req.getMacAddress().toUpperCase())
+                .macAddress(normalizedMac)
                 .coordX(req.getCoordX())
                 .coordY(req.getCoordY())
                 .notes(req.getNotes())
@@ -127,14 +129,21 @@ public class StationService {
     public StationDto.Response update(Long id, StationDto.Request req) {
         Station station = getEntityById(id);
 
-        // Nếu đổi MAC thì check trùng
-        if (!station.getMacAddress().equalsIgnoreCase(req.getMacAddress())
-                && stationRepository.findByMacAddress(req.getMacAddress()).isPresent()) {
-            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống");
+        String normalizedMac = req.getMacAddress().toUpperCase();
+
+        // Nếu đổi MAC thì check trùng (bao gồm cả row đã soft-delete).
+        // Bỏ qua chính nó (id khác nhau vẫn OK).
+        if (!station.getMacAddress().equalsIgnoreCase(normalizedMac)) {
+            stationRepository.findByMacAddressIncludingDeleted(normalizedMac)
+                    .ifPresent(existing -> {
+                        if (!existing.getId().equals(id)) {
+                            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
+                        }
+                    });
         }
 
         station.setName(req.getName());
-        station.setMacAddress(req.getMacAddress().toUpperCase());
+        station.setMacAddress(normalizedMac);
         station.setCoordX(req.getCoordX());
         station.setCoordY(req.getCoordY());
         station.setNotes(req.getNotes());
