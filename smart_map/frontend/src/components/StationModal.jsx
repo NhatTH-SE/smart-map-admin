@@ -15,10 +15,10 @@ const STATUS_LABELS = {
  */
 export default function StationModal({
   open, onClose, onSuccess,
-  mapId,         // bắt buộc nếu tạo từ editor và không truyền station
-  station,       // có nếu sửa
-  coordX,        // tùy chọn
-  coordY,        // tùy chọn
+  mapId,
+  station,
+  coordX,
+  coordY,
 }) {
   const isEdit = !!station
   const [maps, setMaps] = useState([])
@@ -32,7 +32,6 @@ export default function StationModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Load danh sách bản đồ khi mở ở chế độ "tạo" mà chưa có mapId
   useEffect(() => {
     if (!open || isEdit || mapId) return
     let alive = true
@@ -42,7 +41,6 @@ export default function StationModal({
     return () => { alive = false }
   }, [open, isEdit, mapId])
 
-  // Đồng bộ form state khi mở / đổi station
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return
@@ -119,37 +117,35 @@ export default function StationModal({
     }
   }
 
-  // Đã chọn map sẵn (từ editor) → ẩn dropdown
   const hideMapPicker = !!mapId && !isEdit
   const hideCoordPicker = (coordX != null && coordY != null) && !isEdit
   const hasMapOptions = maps.length > 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-ink-900 border border-ink-700 shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-ink-800">
+      <div className="bg-bg-soft border border-border-strong shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
             <p className="text-[10px] font-semibold tracking-widest uppercase text-accent-400 mb-1">
               {isEdit ? 'Chỉnh sửa' : 'Tạo mới'}
             </p>
-            <h2 className="text-base font-semibold text-white">
+            <h2 className="text-base font-semibold text-text">
               {isEdit ? 'Sửa trạm' : 'Tạo trạm mới'}
             </h2>
           </div>
-          <button onClick={onClose} className="text-ink-400 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-ink-800" aria-label="Đóng">×</button>
+          <button onClick={onClose} className="text-text-muted hover:text-text text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-border" aria-label="Đóng">×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
-          {/* Map picker (chỉ hiện khi tạo từ list, không có mapId truyền sẵn) */}
           {!hideMapPicker && (
             <div>
-              <label className="label">Bản đồ <span className="text-red-400 normal-case">*</span></label>
+              <label className="label">Bản đồ <span className="text-red-600 normal-case">*</span></label>
               {isEdit ? (
                 <input
                   type="text"
                   value={station.mapName || ''}
                   readOnly
-                  className="input bg-ink-850 text-ink-300 cursor-not-allowed"
+                  className="input bg-bg-raised text-text-soft cursor-not-allowed"
                 />
               ) : hasMapOptions ? (
                 <select
@@ -164,36 +160,35 @@ export default function StationModal({
                   ))}
                 </select>
               ) : (
-                <div className="px-3 py-2 bg-amber-900/30 border border-amber-700 text-amber-200 text-sm">
+                <div className="px-3 py-2 bg-amber-500/15 border border-amber-500/40 text-amber-700 text-sm">
                   Chưa có bản đồ nào. Hãy tạo bản đồ trước ở module Bản đồ.
                 </div>
               )}
             </div>
           )}
 
-          {/* Tọa độ (nếu đã có sẵn, hiển thị read-only; nếu tạo từ list, cho nhập) */}
           {!hideCoordPicker && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Tọa độ X <span className="text-red-400 normal-case">*</span></label>
+                <label className="label">Tọa độ X <span className="text-red-600 normal-case">*</span></label>
                 <input
                   type="number"
                   value={isEdit ? Math.round(station.coordX) : pickedCoordX}
                   onChange={(e) => setPickedCoordX(e.target.value)}
                   readOnly={isEdit}
-                  className={`input font-mono ${isEdit ? 'bg-ink-850 text-ink-300 cursor-not-allowed' : ''}`}
+                  className={`input font-mono ${isEdit ? 'bg-bg-raised text-text-soft cursor-not-allowed' : ''}`}
                   placeholder="0"
                   step="1"
                 />
               </div>
               <div>
-                <label className="label">Tọa độ Y <span className="text-red-400 normal-case">*</span></label>
+                <label className="label">Tọa độ Y <span className="text-red-600 normal-case">*</span></label>
                 <input
                   type="number"
                   value={isEdit ? Math.round(station.coordY) : pickedCoordY}
                   onChange={(e) => setPickedCoordY(e.target.value)}
                   readOnly={isEdit}
-                  className={`input font-mono ${isEdit ? 'bg-ink-850 text-ink-300 cursor-not-allowed' : ''}`}
+                  className={`input font-mono ${isEdit ? 'bg-bg-raised text-text-soft cursor-not-allowed' : ''}`}
                   placeholder="0"
                   step="1"
                 />
@@ -202,17 +197,17 @@ export default function StationModal({
           )}
 
           <div>
-            <label className="label">Tên trạm <span className="text-red-400 normal-case">*</span></label>
+            <label className="label">Tên trạm <span className="text-red-600 normal-case">*</span></label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={100}
               placeholder="VD: Phòng IT, Cửa số 1, Thư viện..." className="input" />
           </div>
 
           <div>
-            <label className="label">MAC Address <span className="text-red-400 normal-case">*</span></label>
+            <label className="label">MAC Address <span className="text-red-600 normal-case">*</span></label>
             <input type="text" value={macAddress} onChange={(e) => setMacAddress(e.target.value)} maxLength={50}
               placeholder="AA:BB:CC:DD:EE:FF" className="input font-mono" />
-            <p className="text-xs text-ink-400 mt-1.5">
-              Định dạng: 6 cặp hex phân cách bởi <code className="bg-ink-800 px-1 py-0.5 font-mono">:</code> hoặc <code className="bg-ink-800 px-1 py-0.5 font-mono">-</code>
+            <p className="text-xs text-text-soft mt-1.5">
+              Định dạng: 6 cặp hex phân cách bởi <code className="bg-bg-raised px-1 py-0.5 font-mono">:</code> hoặc <code className="bg-bg-raised px-1 py-0.5 font-mono">-</code>
             </p>
           </div>
 
@@ -232,10 +227,10 @@ export default function StationModal({
           </div>
 
           {error && (
-            <div className="px-3 py-2.5 bg-danger-soft/40 border border-danger text-red-300 text-sm">{error}</div>
+            <div className="px-3 py-2.5 bg-danger-soft/15 border border-danger text-red-600 text-sm">{error}</div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-ink-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <button type="button" onClick={onClose} disabled={submitting} className="btn-secondary">Hủy</button>
             <button type="submit" disabled={submitting || (!isEdit && !hasMapOptions && !mapId)} className="btn-primary">
               {submitting && <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white animate-spin" />}

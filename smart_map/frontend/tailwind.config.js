@@ -1,37 +1,44 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: {
-          950: "#0b0f14",
-          900: "#0f1620",
-          850: "#121a26",
-          800: "#182230",
-          700: "#1f2b3a",
-          600: "#2b3a4d",
-          500: "#3a4b62",
-          400: "#5d6e85",
-          300: "#8b9bb1",
-          200: "#aebccf",
-        },
+        /**
+         * Semantic tokens — đổi theo theme.
+         * Sử dụng CSS variables định nghĩa trong :root (light) và .dark (dark).
+         * Tailwind sẽ sinh ra class `bg-bg`, `text-text`, `border-border`...
+         */
+        bg: 'var(--bg)',
+        'bg-soft': 'var(--bg-soft)',
+        'bg-raised': 'var(--bg-raised)',
+        border: 'var(--border)',
+        'border-strong': 'var(--border-strong)',
+        text: 'var(--text)',
+        'text-soft': 'var(--text-soft)',
+        'text-muted': 'var(--text-muted)',
+        'text-inverted': 'var(--text-inverted)',
+
+        // Accent (giữ 1 brand duy nhất, nhưng map primary qua biến cho dễ tinh chỉnh)
         accent: {
-          DEFAULT: "#3b82f6",
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
+          DEFAULT: 'var(--accent)',
+          50: 'var(--accent-50)',
+          100: 'var(--accent-100)',
+          200: 'var(--accent-200)',
+          300: 'var(--accent-300)',
+          400: 'var(--accent-400)',
+          500: 'var(--accent-500)',
+          600: 'var(--accent-600)',
+          700: 'var(--accent-700)',
+          800: 'var(--accent-800)',
+          900: 'var(--accent-900)',
         },
+
+        // Danger — giữ cố định để đảm bảo nghĩa "nguy hiểm" không đổi giữa 2 theme
         danger: {
-          DEFAULT: "#dc2626",
-          soft: "#7f1d1d",
+          DEFAULT: '#dc2626',
+          soft: '#7f1d1d',
         },
       },
       fontFamily: {
@@ -57,8 +64,7 @@ export default {
         DEFAULT: "2px",
       },
       boxShadow: {
-        panel:
-          "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 0 0 1px rgba(255,255,255,0.04)",
+        panel: 'var(--shadow-panel)',
       },
     },
   },

@@ -3,15 +3,8 @@ import { useEffect, useState } from 'react'
 /**
  * Modal xác nhận (thay thế window.confirm).
  * Props:
- *   - open: boolean
- *   - onClose: () => void
- *   - onConfirm: () => void | Promise<void>
- *   - title: string
- *   - message: string | ReactNode
- *   - confirmText: string
- *   - cancelText: string
+ *   - open, onClose, onConfirm, title, message, confirmText, cancelText
  *   - tone: 'danger' | 'primary' | 'warning'
- *   - loading: do component cha điều khiển (nếu cần)
  */
 export default function ConfirmModal({
   open,
@@ -34,7 +27,6 @@ export default function ConfirmModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, submitting, onClose])
 
-  // Đóng = unmount nhờ parent quản lý `open`. Submitting chỉ tồn tại khi modal mở.
   if (!open) return null
 
   const handleConfirm = async () => {
@@ -50,20 +42,20 @@ export default function ConfirmModal({
   const toneStyles = {
     danger: {
       icon: '!',
-      iconBg: 'bg-danger-soft/40',
-      iconText: 'text-red-300',
+      iconBg: 'bg-danger-soft/20',
+      iconText: 'text-red-600',
       btn: 'btn-danger',
     },
     warning: {
       icon: '!',
-      iconBg: 'bg-amber-900/40',
-      iconText: 'text-amber-300',
+      iconBg: 'bg-amber-500/15',
+      iconText: 'text-amber-600',
       btn: 'bg-amber-600 text-white hover:bg-amber-700 border border-amber-700',
     },
     primary: {
       icon: '?',
-      iconBg: 'bg-accent-900/40',
-      iconText: 'text-accent-300',
+      iconBg: 'bg-accent-900/20',
+      iconText: 'text-accent-600',
       btn: 'btn-primary',
     },
   }
@@ -71,20 +63,20 @@ export default function ConfirmModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-ink-900 border border-ink-700 shadow-2xl w-full max-w-md">
-        <div className="flex items-start gap-4 p-5 border-b border-ink-800">
+      <div className="bg-bg-soft border border-border-strong shadow-2xl w-full max-w-md">
+        <div className="flex items-start gap-4 p-5 border-b border-border">
           <div className={`w-10 h-10 ${t.iconBg} ${t.iconText} flex items-center justify-center text-lg font-bold shrink-0`}>
             {t.icon}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-white">{title}</h3>
+            <h3 className="text-base font-semibold text-text">{title}</h3>
             {message && (
-              <p className="text-sm text-ink-300 mt-1.5 leading-relaxed">{message}</p>
+              <p className="text-sm text-text-soft mt-1.5 leading-relaxed">{message}</p>
             )}
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 bg-ink-850">
+        <div className="flex justify-end gap-2 px-5 py-4 bg-bg-raised">
           <button type="button" onClick={onClose} disabled={submitting} className="btn-secondary">
             {cancelText}
           </button>

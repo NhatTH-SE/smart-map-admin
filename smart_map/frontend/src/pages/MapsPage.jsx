@@ -26,8 +26,9 @@ export default function MapsPage() {
     }
   }, [])
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { load() }, [load])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const askDelete = (m) => {
     setDeletingId(m.id)
@@ -49,11 +50,11 @@ export default function MapsPage() {
   return (
     <div className="p-8 max-w-7xl">
       {/* Header */}
-      <div className="flex items-end justify-between mb-6 pb-5 border-b border-ink-800">
+      <div className="flex items-end justify-between mb-6 pb-5 border-b border-border">
         <div>
           <p className="text-[11px] font-semibold tracking-widest uppercase text-accent-400 mb-1">Module 01</p>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">Quản lý Bản đồ</h1>
-          <p className="text-sm text-ink-400 mt-1.5">
+          <h1 className="text-2xl font-semibold text-text tracking-tight">Quản lý Bản đồ</h1>
+          <p className="text-sm text-text-soft mt-1.5">
             Upload sơ đồ mặt bằng và quản lý nhiều tầng/khu vực.
           </p>
         </div>
@@ -67,26 +68,26 @@ export default function MapsPage() {
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-ink-400">
-          Tổng cộng <span className="text-ink-200 font-mono">{maps.length}</span> bản đồ
+        <p className="text-xs text-text-soft">
+          Tổng cộng <span className="text-text font-mono">{maps.length}</span> bản đồ
         </p>
       </div>
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-ink-400">
-          <span className="inline-block w-5 h-5 border-2 border-ink-700 border-t-accent-500 animate-spin mr-3" />
+        <div className="flex items-center justify-center py-20 text-text-soft">
+          <span className="inline-block w-5 h-5 border-2 border-border-strong border-t-accent-500 animate-spin mr-3" />
           Đang tải...
         </div>
       ) : maps.length === 0 ? (
-        <div className="bg-ink-900 border border-dashed border-ink-700 py-20 text-center">
-          <div className="w-12 h-12 mx-auto bg-ink-800 flex items-center justify-center mb-4">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-ink-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="bg-bg-soft border border-dashed border-border-strong py-20 text-center">
+          <div className="w-12 h-12 mx-auto bg-border flex items-center justify-center mb-4">
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z M12 3v18" />
             </svg>
           </div>
-          <p className="text-white font-medium">Chưa có bản đồ nào</p>
-          <p className="text-ink-400 text-sm mt-1 mb-5">Upload sơ đồ đầu tiên để bắt đầu.</p>
+          <p className="text-text font-medium">Chưa có bản đồ nào</p>
+          <p className="text-text-soft text-sm mt-1 mb-5">Upload sơ đồ đầu tiên để bắt đầu.</p>
           <button onClick={() => setOpenUpload(true)} className="btn-primary">
             Upload ngay
           </button>
@@ -96,9 +97,9 @@ export default function MapsPage() {
           {maps.map((m) => (
             <div
               key={m.id}
-              className="bg-ink-900 border border-ink-800 hover:border-ink-700 transition-colors group"
+              className="bg-bg-soft border border-border hover:border-border-strong transition-colors group"
             >
-              <div className="aspect-video bg-ink-850 flex items-center justify-center overflow-hidden border-b border-ink-800">
+              <div className="aspect-video bg-bg-raised flex items-center justify-center overflow-hidden border-b border-border">
                 <img
                   src={resolveImageUrl(m.imageUrl)}
                   alt={m.name}
@@ -107,7 +108,7 @@ export default function MapsPage() {
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <h3 className="font-semibold text-white truncate flex-1">{m.name}</h3>
+                  <h3 className="font-semibold text-text truncate flex-1">{m.name}</h3>
                   {m.isActive ? (
                     <span className="badge-active">Active</span>
                   ) : (
@@ -115,12 +116,12 @@ export default function MapsPage() {
                   )}
                 </div>
                 {m.description && (
-                  <p className="text-sm text-ink-400 mt-1.5 line-clamp-2">{m.description}</p>
+                  <p className="text-sm text-text-soft mt-1.5 line-clamp-2">{m.description}</p>
                 )}
-                <div className="text-[11px] text-ink-400 mt-2 font-mono uppercase tracking-wider">
+                <div className="text-[11px] text-text-soft mt-2 font-mono uppercase tracking-wider">
                   {m.width} × {m.height} px
                 </div>
-                <div className="flex gap-2 mt-4 pt-4 border-t border-ink-800">
+                <div className="flex gap-2 mt-4 pt-4 border-t border-border">
                   <button
                     onClick={() => navigate(`/admin/maps/${m.id}/edit`)}
                     className="flex-1 btn-primary py-1.5"
@@ -129,7 +130,7 @@ export default function MapsPage() {
                   </button>
                   <button
                     onClick={() => askDelete(m)}
-                    className="px-3 py-1.5 text-xs font-medium text-red-300 bg-danger-soft/40 border border-danger-soft hover:bg-danger hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium text-red-600 bg-danger-soft/10 border border-danger-soft hover:bg-danger hover:text-white transition-colors"
                   >
                     Xóa
                   </button>

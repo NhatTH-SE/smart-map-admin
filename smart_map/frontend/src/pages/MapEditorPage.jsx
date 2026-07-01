@@ -50,8 +50,9 @@ export default function MapEditorPage() {
     }
   }, [id])
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { if (id) loadAll() }, [id, loadAll])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleCanvasClick = (e) => {
     if (draggingId) return
@@ -171,8 +172,8 @@ export default function MapEditorPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-ink-950 text-ink-400">
-        <span className="inline-block w-5 h-5 border-2 border-ink-700 border-t-accent-500 animate-spin mr-3" />
+      <div className="flex items-center justify-center h-screen bg-bg text-text-soft">
+        <span className="inline-block w-5 h-5 border-2 border-border-strong border-t-accent-500 animate-spin mr-3" />
         Đang tải...
       </div>
     )
@@ -180,9 +181,9 @@ export default function MapEditorPage() {
 
   if (!map) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-ink-950 text-ink-400">
+      <div className="flex flex-col items-center justify-center h-screen bg-bg text-text-soft">
         <p>Không tìm thấy bản đồ.</p>
-        <button onClick={() => navigate('/admin/maps')} className="mt-3 text-accent-400 hover:text-accent-300 text-sm">
+        <button onClick={() => navigate('/admin/maps')} className="mt-3 text-accent-500 hover:text-accent-700 text-sm">
           ← Quay lại danh sách
         </button>
       </div>
@@ -193,25 +194,25 @@ export default function MapEditorPage() {
   const canvasH = map.height || 180
 
   return (
-    <div className="flex flex-col h-screen bg-ink-950">
+    <div className="flex flex-col h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-4 px-5 py-3 bg-ink-900 border-b border-ink-800 shrink-0">
+      <div className="flex items-center gap-4 px-5 py-3 bg-bg-soft border-b border-border shrink-0">
         <button onClick={() => navigate('/admin/maps')} className="btn-ghost text-sm">
           <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5 M12 19l-7-7 7-7" />
           </svg>
           <span className="hidden sm:inline">Danh sách</span>
         </button>
-        <div className="h-6 w-px bg-ink-700" />
+        <div className="h-6 w-px bg-border-strong" />
         <div>
           <p className="text-[10px] font-semibold tracking-widest uppercase text-accent-400">Map Editor</p>
-          <h1 className="text-base font-semibold text-white leading-tight">{map.name}</h1>
+          <h1 className="text-base font-semibold text-text leading-tight">{map.name}</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-ink-400">
-            <span className="font-mono text-ink-200">{stations.length}</span> trạm
+          <span className="text-xs text-text-soft">
+            <span className="font-mono text-text">{stations.length}</span> trạm
           </span>
-          <span className="text-[10px] text-ink-400 font-mono uppercase tracking-widest px-2 py-1 border border-ink-700">
+          <span className="text-[10px] text-text-soft font-mono uppercase tracking-widest px-2 py-1 border border-border-strong">
             {canvasW} × {canvasH}
           </span>
         </div>
@@ -220,14 +221,14 @@ export default function MapEditorPage() {
       {/* Body: canvas + sidebar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas */}
-        <div className="flex flex-col flex-1 overflow-auto bg-ink-950">
+        <div className="flex flex-col flex-1 overflow-auto bg-bg">
           <div className="flex-1 flex items-center justify-center p-6 relative">
-            <div className="absolute top-4 left-4 text-[10px] font-semibold tracking-widest uppercase text-ink-400 bg-ink-900 border border-ink-800 px-2 py-1">
+            <div className="absolute top-4 left-4 text-[10px] font-semibold tracking-widest uppercase text-text-soft bg-bg-soft border border-border px-2 py-1">
               Click vào ảnh để đặt trạm
             </div>
             <div
               ref={canvasRef}
-              className="relative bg-ink-850 border border-ink-800 shadow-2xl"
+              className="relative bg-bg-raised border border-border-strong shadow-2xl"
               style={{ width: canvasW, height: canvasH }}
               onClick={handleCanvasClick}
             >
@@ -256,8 +257,12 @@ export default function MapEditorPage() {
                       data-marker
                       onMouseDown={(e) => handleMarkerMouseDown(e, s)}
                       onTouchStart={(e) => handleMarkerTouchStart(e, s)}
-                      className="map-marker w-3 h-3 bg-slate-400 border border-white shadow cursor-grab active:cursor-grabbing"
-                      style={{ cursor: isDraggingThis ? 'grabbing' : 'grab' }}
+                      className="map-marker w-3 h-3 shadow cursor-grab active:cursor-grabbing"
+                      style={{
+                        cursor: isDraggingThis ? 'grabbing' : 'grab',
+                        backgroundColor: 'var(--text-inverted)',
+                        border: `2px solid ${STATUS_COLOR[s.status] || '#94a3b8'}`,
+                      }}
                       title={s.name}
                     />
                   </div>
@@ -268,26 +273,26 @@ export default function MapEditorPage() {
         </div>
 
         {/* Sidebar */}
-        <aside className="w-80 bg-ink-900 border-l border-ink-800 overflow-y-auto shrink-0">
-          <div className="px-5 py-4 border-b border-ink-800 flex items-center justify-between">
+        <aside className="w-80 bg-bg-soft border-l border-border overflow-y-auto shrink-0">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold tracking-widest uppercase text-accent-400">Stations</p>
-              <h2 className="text-sm font-semibold text-white mt-0.5">Danh sách trạm</h2>
+              <h2 className="text-sm font-semibold text-text mt-0.5">Danh sách trạm</h2>
             </div>
-            <span className="text-xs font-mono text-ink-300 bg-ink-800 px-2 py-1">{stations.length}</span>
+            <span className="text-xs font-mono text-text-soft bg-bg-raised px-2 py-1">{stations.length}</span>
           </div>
 
-          {/* Filter theo status (tự nhiên hiển thị) */}
-          <div className="px-5 py-3 border-b border-ink-800">
-            <p className="text-[10px] font-semibold tracking-widest uppercase text-ink-400 mb-2">Trạng thái</p>
+          {/* Status legend */}
+          <div className="px-5 py-3 border-b border-border">
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-text-soft mb-2">Trạng thái</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(STATUS_LABEL).map(([k, label]) => {
                 const count = stations.filter((s) => s.status === k).length
                 return (
-                  <div key={k} className="flex items-center gap-1.5 text-xs text-ink-300">
+                  <div key={k} className="flex items-center gap-1.5 text-xs text-text-soft">
                     <span className="w-2 h-2" style={{ backgroundColor: STATUS_COLOR[k] }} />
                     <span>{label}</span>
-                    <span className="text-ink-400 font-mono">{count}</span>
+                    <span className="text-text-muted font-mono">{count}</span>
                   </div>
                 )
               })}
@@ -295,16 +300,16 @@ export default function MapEditorPage() {
           </div>
 
           {stations.length === 0 ? (
-            <div className="p-10 text-center text-sm text-ink-400">
-              <p className="font-medium text-ink-300 mb-1">Chưa có trạm nào</p>
+            <div className="p-10 text-center text-sm text-text-soft">
+              <p className="font-medium text-text mb-1">Chưa có trạm nào</p>
               <p className="text-xs">Click lên ảnh để thêm trạm đầu tiên.</p>
             </div>
           ) : (
-            <ul className="divide-y divide-ink-800">
+            <ul className="divide-y divide-border">
               {stations.map((s) => (
                 <li
                   key={s.id}
-                  className="p-4 hover:bg-ink-850 cursor-pointer transition-colors group"
+                  className="p-4 hover:bg-bg-raised cursor-pointer transition-colors group"
                   onClick={() => setEditingStation(s)}
                 >
                   <div className="flex items-start gap-3">
@@ -313,15 +318,15 @@ export default function MapEditorPage() {
                       style={{ backgroundColor: STATUS_COLOR[s.status] || '#94a3b8' }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-white truncate">{s.name}</div>
-                      <div className="text-xs text-ink-400 font-mono truncate mt-0.5">{s.macAddress}</div>
-                      <div className="text-[10px] text-ink-500 mt-1 font-mono uppercase tracking-wider">
+                      <div className="font-medium text-sm text-text truncate">{s.name}</div>
+                      <div className="text-xs text-text-soft font-mono truncate mt-0.5">{s.macAddress}</div>
+                      <div className="text-[10px] text-text-muted mt-1 font-mono uppercase tracking-wider">
                         ({Math.round(s.coordX)}, {Math.round(s.coordY)}) · {STATUS_LABEL[s.status]}
                       </div>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeletingStation(s) }}
-                      className="text-ink-500 hover:text-red-400 text-lg leading-none shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center hover:bg-ink-800"
+                      className="text-text-muted hover:text-red-600 text-lg leading-none shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center hover:bg-border"
                       title="Xóa trạm"
                     >×</button>
                   </div>
