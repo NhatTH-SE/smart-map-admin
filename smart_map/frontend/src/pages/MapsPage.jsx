@@ -37,13 +37,15 @@ export default function MapsPage() {
 
   const handleDelete = async () => {
     const id = deletingId
+    const name = deletingName
+    setDeletingId(null) // đóng modal ngay
+    setDeletingName('')
     try {
       await mapApi.remove(id)
       setMaps((prev) => prev.filter((m) => m.id !== id))
-      toast.success(`Đã xóa "${deletingName}"`)
+      toast.success(`Đã xóa "${name}"`)
     } catch (err) {
       toast.error('Xóa thất bại: ' + (err.message || 'lỗi không xác định'))
-      throw err
     }
   }
 

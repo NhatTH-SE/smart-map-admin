@@ -162,13 +162,13 @@ export default function MapEditorPage() {
 
   const handleDeleteStation = async () => {
     const s = deletingStation
+    setDeletingStation(null) // đóng modal ngay, không đợi request
     try {
       await stationApi.remove(s.id)
       setStations((prev) => prev.filter((x) => x.id !== s.id))
       toast.success(`Đã xóa "${s.name}"`)
     } catch (err) {
       toast.error('Xóa thất bại: ' + err.message)
-      throw err
     }
   }
 
@@ -272,11 +272,11 @@ export default function MapEditorPage() {
                       data-marker
                       onMouseDown={(e) => handleMarkerMouseDown(e, s)}
                       onTouchStart={(e) => handleMarkerTouchStart(e, s)}
-                      className="map-marker w-3 h-3 shadow cursor-grab active:cursor-grabbing"
+                      className="map-marker w-4 h-4 shadow cursor-grab active:cursor-grabbing"
                       style={{
                         cursor: isDraggingThis ? 'grabbing' : 'grab',
                         backgroundColor: 'var(--text-inverted)',
-                        border: `2px solid ${STATUS_COLOR[s.status] || '#94a3b8'}`,
+                        border: `2px solid #94a3b8`,
                       }}
                       title={s.name}
                     />
