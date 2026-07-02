@@ -130,7 +130,7 @@ export default function ExportCodeModal({ open, onClose, mapId, mapName }) {
               ) : (
                 <>
                   Mảng <span className="font-mono text-text">cac_tram[]</span> có{' '}
-                  <span className="font-mono font-semibold text-text">{stationCount}</span> phần tử
+                  <span className="font-mono font-semibold text-text">{stationCount + 1}</span> phần tử (gồm 1 gốc 0,0)
                 </>
               )}
             </span>
@@ -161,8 +161,10 @@ export default function ExportCodeModal({ open, onClose, mapId, mapName }) {
           {/* Hint */}
           <p className="text-xs text-text-soft leading-relaxed">
             Copy đoạn code và chèn vào <code className="bg-bg-raised px-1.5 py-0.5 font-mono">main.cpp</code> của
-            firmware ESP32, hoặc tải về để chép vào project Arduino. Cấu trúc{' '}
-            <span className="font-mono">ToaDoMain</span> phải được khai báo trước khi dùng.
+            firmware ESP32, hoặc tải về để chép vào project Arduino. File sinh ra gồm
+            <span className="font-mono"> cac_tram[]</span> (tọa độ) và <span className="font-mono">ten_tram[]</span>
+            (tên trạm tương ứng). Index 0 của <span className="font-mono">ten_tram</span> là{' '}
+            <span className="font-mono">"Không xác định"</span>.
           </p>
         </div>
 

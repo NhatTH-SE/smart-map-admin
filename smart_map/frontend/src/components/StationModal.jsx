@@ -9,38 +9,75 @@ const STATUS_LABELS = {
 }
 
 /**
- * Modal tạo/sửa trạm. Hỗ trợ 2 flow:
- *   - Từ Map Editor: truyền mapId/coordX/coordY sẵn (click-to-add).
- *   - Từ Stations list: truyền station để sửa hoặc không có gì (modal tự load danh sách map để chọn).
+ * Modal tạo/sửa trạm. Hỗ trợ 2 chế độ:
+ *   - 'minimal' (mặc định cho Map Editor): chỉ nhập tên, hiển thị tọa độ.
+ *   - 'full' (cho Stations Page): chọn bản đồ → chọn station đã vẽ trên map
+ *       (auto-fill name + X, Y) → nhập MAC + trạng thái.
+ *
+ * Props:
+ *   - open, onClose, onSuccess
+ *   - mode: 'minimal' | 'full' (mặc định 'minimal')
+ *   - mapId, coordX, coordY: pre-fill vị trí khi mở từ Map Editor
+ *   - station: nếu sửa, truyền station hiện tại
+ *   - maps: optional, danh sách map cho mode 'full' (không truyền → tự load)
+ *   - prefillMac: gợi ý MAC khi tạo mới ở mode 'full'
  */
 export default function StationModal({
   open, onClose, onSuccess,
+  mode = 'minimal',
   mapId,
   station,
   coordX,
   coordY,
+  maps: mapsProp,
+  prefillMac,
 }) {
   const isEdit = !!station
+  const isFull = mode === 'full'
+
   const [maps, setMaps] = useState([])
+  const [stationsOnMap, setStationsOnMap] = useState([])
+  const [pickedMapId, setPickedMapId] = useState('')
+  const [pickedStationId, setPickedStationId] = useState('')
   const [name, setName] = useState('')
   const [macAddress, setMacAddress] = useState('')
-  const [pickedMapId, setPickedMapId] = useState('')
   const [pickedCoordX, setPickedCoordX] = useState('')
   const [pickedCoordY, setPickedCoordY] = useState('')
   const [status, setStatus] = useState('ACTIVE')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [loadingStations, setLoadingStations] = useState(false)
 
+  // Load danh sách map (mode full, không phải edit, không có sẵn mapsProp)
   useEffect(() => {
-    if (!open || isEdit || mapId) return
+    if (!open || !isFull || isEdit || mapsProp) return
     let alive = true
     mapApi.getAll()
       .then((data) => { if (alive) setMaps(data || []) })
       .catch(() => { if (alive) setMaps([]) })
     return () => { alive = false }
-  }, [open, isEdit, mapId])
+  }, [open, isFull, isEdit, mapsProp])
 
+  // Khi đổi map ở mode full (create) → load danh sách station đã vẽ trên map đó
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!open || !isFull || isEdit) return
+    if (!pickedMapId) { setStationsOnMap([]); setLoadingStations(false); return }
+    let alive = true
+    setLoadingStations(true)
+    stationApi.getByMap(Number(pickedMapId))
+      .then((data) => {
+        if (!alive) return
+        setStationsOnMap((data || []).filter((s) => !s.deletedAt))
+      })
+      .catch(() => { if (alive) setStationsOnMap([]) })
+      .finally(() => { if (alive) setLoadingStations(false) })
+    return () => { alive = false }
+  }, [open, isFull, isEdit, pickedMapId])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Reset form khi mở
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return
@@ -52,18 +89,20 @@ export default function StationModal({
       setPickedCoordY(station.coordY != null ? String(Math.round(station.coordY)) : '')
       setStatus(station.status || 'ACTIVE')
       setNotes(station.notes || '')
+      setPickedStationId('')
     } else {
-      setName(''); setMacAddress('')
+      setName(''); setMacAddress(prefillMac || '')
       setPickedMapId(mapId ? String(mapId) : '')
       setPickedCoordX(coordX != null ? String(Math.round(coordX)) : '')
       setPickedCoordY(coordY != null ? String(Math.round(coordY)) : '')
       setStatus('ACTIVE'); setNotes('')
+      setPickedStationId('')
     }
     setError('')
-  }, [open, isEdit, station, mapId, coordX, coordY])
+  }, [open, isEdit, station, mapId, coordX, coordY, prefillMac])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Auto-clear error khi user gõ lại MAC/Name (để error cũ không "ám" form)
+  // Auto-clear error khi user gõ lại
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (error) setError('')
@@ -79,37 +118,61 @@ export default function StationModal({
 
   if (!open) return null
 
+  const handlePickStation = (stationId) => {
+    setPickedStationId(stationId)
+    if (!stationId) return
+    const found = stationsOnMap.find((s) => String(s.id) === String(stationId))
+    if (!found) return
+    setName(found.name || '')
+    setPickedCoordX(found.coordX != null ? String(Math.round(found.coordX)) : '')
+    setPickedCoordY(found.coordY != null ? String(Math.round(found.coordY)) : '')
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
 
     if (!name.trim()) return setError('Vui lòng nhập tên trạm')
-    if (!macAddress.trim()) return setError('Vui lòng nhập MAC address')
 
-    const finalMapId = isEdit
-      ? station.mapId
-      : (mapId ?? (pickedMapId ? Number(pickedMapId) : null))
+    let finalMapId, finalX, finalY
+    if (isEdit) {
+      finalMapId = station.mapId
+      finalX = isFull ? Number(pickedCoordX || station.coordX) : station.coordX
+      finalY = isFull ? Number(pickedCoordY || station.coordY) : station.coordY
+    } else {
+      if (isFull) {
+        finalMapId = pickedMapId ? Number(pickedMapId) : null
+      } else {
+        finalMapId = mapId ?? (pickedMapId ? Number(pickedMapId) : null)
+      }
+      finalX = coordX ?? Number(pickedCoordX)
+      finalY = coordY ?? Number(pickedCoordY)
+    }
     if (!finalMapId) return setError('Vui lòng chọn bản đồ')
-
-    const finalX = isEdit
-      ? station.coordX
-      : (coordX ?? Number(pickedCoordX))
-    const finalY = isEdit
-      ? station.coordY
-      : (coordY ?? Number(pickedCoordY))
     if (finalX == null || Number.isNaN(finalX)) return setError('Vui lòng nhập tọa độ X')
     if (finalY == null || Number.isNaN(finalY)) return setError('Vui lòng nhập tọa độ Y')
 
+    // mode full yêu cầu MAC + status (chọn từ dropdown station chỉ khi create)
+    if (isFull && !isEdit && !pickedStationId) {
+      return setError('Vui lòng chọn trạm đã vẽ trên bản đồ')
+    }
+    if (isFull && !macAddress.trim()) {
+      return setError('Vui lòng nhập MAC address')
+    }
+
     setSubmitting(true)
     try {
+      // mode minimal (Map Editor): MAC không cần → gửi null.
+      // mode full (Stations Page): bắt buộc MAC + status (đã check ở trên).
+      const mac = isFull ? (macAddress || '').trim().toUpperCase() : null
       const payload = {
         mapId: finalMapId,
         name: name.trim(),
-        macAddress: macAddress.trim().toUpperCase(),
+        macAddress: mac,
         coordX: finalX,
         coordY: finalY,
-        status,
-        notes: notes.trim() || null,
+        status: isFull ? status : 'ACTIVE',
+        notes: isFull ? (notes.trim() || null) : null,
       }
       if (isEdit) {
         await stationApi.update(station.id, payload)
@@ -125,9 +188,9 @@ export default function StationModal({
     }
   }
 
-  const hideMapPicker = !!mapId && !isEdit
-  const hideCoordPicker = (coordX != null && coordY != null) && !isEdit
-  const hasMapOptions = maps.length > 0
+  const mapsList = mapsProp || maps
+  const hasMapOptions = mapsList.length > 0
+  const hasStationOptions = stationsOnMap.length > 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -138,32 +201,26 @@ export default function StationModal({
               {isEdit ? 'Chỉnh sửa' : 'Tạo mới'}
             </p>
             <h2 className="text-base font-semibold text-text">
-              {isEdit ? 'Sửa trạm' : 'Tạo trạm mới'}
+              {isEdit ? 'Sửa trạm' : (isFull ? 'Thêm trạm phát' : 'Tạo trạm mới')}
             </h2>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-border" aria-label="Đóng">×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
-          {!hideMapPicker && (
+          {/* ===== Mode full + create: chọn map trước ===== */}
+          {isFull && !isEdit && !mapId && (
             <div>
               <label className="label">Bản đồ <span className="text-red-600 normal-case">*</span></label>
-              {isEdit ? (
-                <input
-                  type="text"
-                  value={station.mapName || ''}
-                  readOnly
-                  className="input bg-bg-raised text-text-soft cursor-not-allowed"
-                />
-              ) : hasMapOptions ? (
+              {hasMapOptions ? (
                 <select
                   value={pickedMapId}
-                  onChange={(e) => setPickedMapId(e.target.value)}
+                  onChange={(e) => { setPickedMapId(e.target.value); setPickedStationId('') }}
                   className="input"
                   required
                 >
                   <option value="">-- Chọn bản đồ --</option>
-                  {maps.map((m) => (
+                  {mapsList.map((m) => (
                     <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
                 </select>
@@ -175,64 +232,112 @@ export default function StationModal({
             </div>
           )}
 
-          {!hideCoordPicker && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Tọa độ X <span className="text-red-600 normal-case">*</span></label>
-                <input
-                  type="number"
-                  value={isEdit ? Math.round(station.coordX) : pickedCoordX}
-                  onChange={(e) => setPickedCoordX(e.target.value)}
-                  readOnly={isEdit}
-                  className={`input font-mono ${isEdit ? 'bg-bg-raised text-text-soft cursor-not-allowed' : ''}`}
-                  placeholder="0"
-                  step="1"
-                />
-              </div>
-              <div>
-                <label className="label">Tọa độ Y <span className="text-red-600 normal-case">*</span></label>
-                <input
-                  type="number"
-                  value={isEdit ? Math.round(station.coordY) : pickedCoordY}
-                  onChange={(e) => setPickedCoordY(e.target.value)}
-                  readOnly={isEdit}
-                  className={`input font-mono ${isEdit ? 'bg-bg-raised text-text-soft cursor-not-allowed' : ''}`}
-                  placeholder="0"
-                  step="1"
-                />
-              </div>
+          {/* ===== Mode full + create: chọn station đã vẽ ===== */}
+          {isFull && !isEdit && pickedMapId && (
+            <div>
+              <label className="label">Trạm đã vẽ trên bản đồ <span className="text-red-600 normal-case">*</span></label>
+              {loadingStations ? (
+                <div className="px-3 py-2 text-xs text-text-soft">Đang tải danh sách…</div>
+              ) : hasStationOptions ? (
+                <>
+                  <select
+                    value={pickedStationId}
+                    onChange={(e) => handlePickStation(e.target.value)}
+                    className="input"
+                    required
+                  >
+                    <option value="">-- Chọn trạm đã vẽ --</option>
+                    {stationsOnMap.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        #{s.id} · {s.name} ({Math.round(s.coordX)}, {Math.round(s.coordY)})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-text-soft mt-1.5">
+                    Chọn 1 dot đã đặt ở Map Editor. Tên và tọa độ sẽ tự điền — bạn chỉ cần nhập MAC.
+                  </p>
+                </>
+              ) : (
+                <div className="px-3 py-2 bg-amber-500/15 border border-amber-500/40 text-amber-700 text-sm">
+                  Bản đồ này chưa có trạm nào. Hãy vào Map Editor để vẽ dot trước.
+                </div>
+              )}
             </div>
           )}
 
+          {/* ===== Mode full + edit: hiển thị map + tọa độ readonly ===== */}
+          {isFull && isEdit && (
+            <>
+              <div>
+                <label className="label">Bản đồ</label>
+                <input type="text" value={station.mapName || ''} readOnly
+                  className="input bg-bg-raised text-text-soft cursor-not-allowed" />
+              </div>
+            </>
+          )}
+
+          {/* ===== Tên + tọa độ ===== */}
           <div>
             <label className="label">Tên trạm <span className="text-red-600 normal-case">*</span></label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={100}
-              placeholder="VD: Phòng IT, Cửa số 1, Thư viện..." className="input" />
+              placeholder="VD: Cửa Số 1, Phòng IT..." className="input" />
           </div>
 
-          <div>
-            <label className="label">MAC Address <span className="text-red-600 normal-case">*</span></label>
-            <input type="text" value={macAddress} onChange={(e) => setMacAddress(e.target.value)} maxLength={50}
-              placeholder="AA:BB:CC:DD:EE:FF" className="input font-mono" />
-            <p className="text-xs text-text-soft mt-1.5">
-              Định dạng: 6 cặp hex phân cách bởi <code className="bg-bg-raised px-1 py-0.5 font-mono">:</code> hoặc <code className="bg-bg-raised px-1 py-0.5 font-mono">-</code>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Tọa độ X</label>
+              <input
+                type="text"
+                value={isFull
+                  ? pickedCoordX
+                  : (isEdit ? Math.round(station.coordX) : pickedCoordX)}
+                readOnly={!isFull}
+                onChange={(e) => setPickedCoordX(e.target.value)}
+                className={`input font-mono ${!isFull ? 'bg-bg-raised text-text-soft cursor-not-allowed' : ''}`}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="label">Tọa độ Y</label>
+              <input
+                type="text"
+                value={isFull
+                  ? pickedCoordY
+                  : (isEdit ? Math.round(station.coordY) : pickedCoordY)}
+                readOnly={!isFull}
+                onChange={(e) => setPickedCoordY(e.target.value)}
+                className={`input font-mono ${!isFull ? 'bg-bg-raised text-text-soft cursor-not-allowed' : ''}`}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          {!isFull && (
+            <p className="text-xs text-text-soft -mt-3">
+              Tọa độ lấy từ vị trí click trên bản đồ (Map Editor).
             </p>
-          </div>
+          )}
 
-          <div>
-            <label className="label">Trạng thái</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
-              <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
-              <option value="MAINTENANCE">{STATUS_LABELS.MAINTENANCE}</option>
-              <option value="LOST">{STATUS_LABELS.LOST}</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Ghi chú</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2}
-              placeholder="Ghi chú về vị trí lắp đặt..." className="input resize-none" />
-          </div>
+          {/* ===== Mode full: MAC + status ===== */}
+          {isFull && (
+            <>
+              <div>
+                <label className="label">MAC Address <span className="text-red-600 normal-case">*</span></label>
+                <input type="text" value={macAddress} onChange={(e) => setMacAddress(e.target.value)} maxLength={50}
+                  placeholder="AA:BB:CC:DD:EE:FF" className="input font-mono" />
+                <p className="text-xs text-text-soft mt-1.5">
+                  Định dạng: 6 cặp hex phân cách bởi <code className="bg-bg-raised px-1 py-0.5 font-mono">:</code> hoặc <code className="bg-bg-raised px-1 py-0.5 font-mono">-</code>
+                </p>
+              </div>
+              <div>
+                <label className="label">Trạng thái</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
+                  <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
+                  <option value="MAINTENANCE">{STATUS_LABELS.MAINTENANCE}</option>
+                  <option value="LOST">{STATUS_LABELS.LOST}</option>
+                </select>
+              </div>
+            </>
+          )}
 
           {error && (
             <div className="px-3 py-2.5 bg-danger-soft/15 border border-danger text-red-600 text-sm">{error}</div>
@@ -240,9 +345,13 @@ export default function StationModal({
 
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <button type="button" onClick={onClose} disabled={submitting} className="btn-secondary">Hủy</button>
-            <button type="submit" disabled={submitting || (!isEdit && !hasMapOptions && !mapId)} className="btn-primary">
+            <button
+              type="submit"
+              disabled={submitting || (isFull && !isEdit && !hasStationOptions)}
+              className="btn-primary"
+            >
               {submitting && <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white animate-spin" />}
-              {isEdit ? 'Cập nhật' : 'Tạo trạm'}
+              {isEdit ? 'Cập nhật' : (isFull ? 'Thêm trạm phát' : 'Tạo trạm')}
             </button>
           </div>
         </form>

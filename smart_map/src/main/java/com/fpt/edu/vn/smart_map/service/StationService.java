@@ -97,28 +97,45 @@ public class StationService {
         MapEntity map = mapRepository.findById(req.getMapId())
                 .orElseThrow(() -> new ApiException(404, "Không tìm thấy bản đồ với id=" + req.getMapId()));
 
-        // Check trùng MAC — phải bao gồm cả row đã soft-delete vì UNIQUE constraint
-        // áp dụng cho mọi row trong bảng.
-        String normalizedMac = req.getMacAddress().toUpperCase();
-        if (stationRepository.findByMacAddressIncludingDeleted(normalizedMac).isPresent()) {
-            throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
+        // MAC optional: chỉ check trùng nếu user nhập thực sự.
+        // Map Editor vẽ dot chỉ cần tên + tọa độ → MAC = null/blank → bỏ qua check.
+        String rawMac = req.getMacAddress();
+        if (rawMac != null && !rawMac.trim().isEmpty()) {
+            String normalizedMac = rawMac.trim().toUpperCase();
+            if (stationRepository.findByMacAddressIncludingDeleted(normalizedMac).isPresent()) {
+                throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
+            }
+            Station station = Station.builder()
+                    .map(map)
+                    .name(req.getName())
+                    .macAddress(normalizedMac)
+                    .coordX(req.getCoordX())
+                    .coordY(req.getCoordY())
+                    .notes(req.getNotes())
+                    .status(req.getStatus() != null ? req.getStatus() : "ACTIVE")
+                    .build();
+            Station saved = stationRepository.save(station);
+            log.info("Created station id={} name='{}' mac={} at ({},{})",
+                    saved.getId(), saved.getName(), saved.getMacAddress(),
+                    saved.getCoordX(), saved.getCoordY());
+            return toResponse(saved);
         }
 
+        // MAC rỗng: lưu NULL.
         Station station = Station.builder()
                 .map(map)
                 .name(req.getName())
-                .macAddress(normalizedMac)
+                .macAddress(null)
                 .coordX(req.getCoordX())
                 .coordY(req.getCoordY())
                 .notes(req.getNotes())
                 .status(req.getStatus() != null ? req.getStatus() : "ACTIVE")
                 .build();
-
-        station = stationRepository.save(station);
-        log.info("Created station id={} name='{}' mac={} at ({},{})",
-                station.getId(), station.getName(), station.getMacAddress(),
-                station.getCoordX(), station.getCoordY());
-        return toResponse(station);
+        Station saved = stationRepository.save(station);
+        log.info("Created station id={} name='{}' mac=null at ({},{})",
+                saved.getId(), saved.getName(),
+                saved.getCoordX(), saved.getCoordY());
+        return toResponse(saved);
     }
 
     // =========================================================================
@@ -129,17 +146,21 @@ public class StationService {
     public StationDto.Response update(Long id, StationDto.Request req) {
         Station station = getEntityById(id);
 
-        String normalizedMac = req.getMacAddress().toUpperCase();
+        String rawMac = req.getMacAddress();
+        boolean macProvided = rawMac != null && !rawMac.trim().isEmpty();
+        String normalizedMac = macProvided ? rawMac.trim().toUpperCase() : null;
 
-        // Nếu đổi MAC thì check trùng (bao gồm cả row đã soft-delete).
-        // Bỏ qua chính nó (id khác nhau vẫn OK).
-        if (!station.getMacAddress().equalsIgnoreCase(normalizedMac)) {
+        // Nếu đổi MAC sang giá trị khác (không rỗng) thì check trùng.
+        if (macProvided && !normalizedMac.equalsIgnoreCase(station.getMacAddress())) {
             stationRepository.findByMacAddressIncludingDeleted(normalizedMac)
                     .ifPresent(existing -> {
                         if (!existing.getId().equals(id)) {
                             throw new ApiException(409, "MAC address đã tồn tại trong hệ thống (kể cả trạm đã xóa)");
                         }
                     });
+        } else if (!macProvided) {
+            // User xóa MAC → set null, KHÔNG check trùng.
+            normalizedMac = null;
         }
 
         station.setName(req.getName());

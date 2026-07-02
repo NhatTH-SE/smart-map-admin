@@ -295,19 +295,23 @@ export default function StationsPage() {
         </div>
       )}
 
-      {/* Modal: tạo */}
+      {/* Modal: tạo (mode 'full' — chọn map → chọn station đã vẽ → nhập MAC + status) */}
       <StationModal
+        mode="full"
         open={creating}
         onClose={() => setCreating(false)}
         onSuccess={handleCreatedOrUpdated}
+        maps={maps}
       />
 
-      {/* Modal: sửa */}
+      {/* Modal: sửa (mode 'full' — map + tọa độ readonly, sửa MAC + status) */}
       <StationModal
+        mode="full"
         open={!!editing}
         station={editing}
         onClose={() => setEditing(null)}
         onSuccess={handleCreatedOrUpdated}
+        maps={maps}
       />
 
       {/* Confirm xóa */}
