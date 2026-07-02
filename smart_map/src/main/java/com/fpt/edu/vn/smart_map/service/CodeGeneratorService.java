@@ -12,17 +12,26 @@ import java.util.List;
 /**
  * Sinh mã C++ (header) cho ESP32 từ danh sách trạm đã gắn trên một bản đồ.
  *
- * <p>Output được chèn thẳng vào <code>main.cpp</code> của thiết bị, dùng làm
- * bảng tra cứu tọa độ + MAC của các trạm phát. Định dạng đầu ra ổn định —
- * byte-for-byte diff chỉ phụ thuộc vào dữ liệu DB (không có timestamp,
- * không có UUID).</p>
- *
- * <p>Quy ước:
+ * <p>Output gồm 2 mảng song song (cùng index → cùng trạm):
  * <ul>
- *   <li>Struct <code>ToaDoMain</code>: id (int), name (const char*), x (int), y (int), mac (const char*)</li>
- *   <li>Sắp xếp theo <code>id ASC</code> để output ổn định qua các lần generate.</li>
- *   <li>Cảnh báo trong comment header nếu có trạm <code>LOST</code>.</li>
+ *   <li><b>cac_tram[]</b>: struct <code>ToaDoMain { int x; int y; }</code> —
+ *       index 0 là gốc tọa độ <code>{0, 0}</code> ứng với "Không xác định".</li>
+ *   <li><b>ten_tram[]</b>: <code>const char*</code> tên trạm tương ứng.</li>
  * </ul>
+ *
+ * <p>Ví dụ output với 4 trạm:
+ * <pre>
+ * ToaDoMain cac_tram[] = {
+ *     {0, 0},
+ *     {34, 58},   // Trạm 1: Cửa Số 1
+ *     {10, 112},  // Trạm 2: IT
+ *     {142, 161}, // Trạm 3: Thư viện
+ *     {220, 61}   // Trạm 4: WC
+ * };
+ * const char *ten_tram[] = {"Không xác định", "Cửa Số 1", "Phòng IT", "Thư Viện", "Nhà WC"};
+ * </pre>
+ *
+ * <p>Sắp xếp theo <code>id ASC</code> để diff ổn định qua các lần generate.</p>
  */
 @Service
 @Slf4j
@@ -74,34 +83,43 @@ public class CodeGeneratorService {
         sb.append("// ============================================================\n\n");
 
         // ----- Count constant ----------------------------------------------
-        sb.append("const int SO_LUONG_TRAM = ").append(sorted.size()).append(";\n\n");
+        // Tổng phần tử = 1 (gốc {0,0}) + số trạm thực tế.
+        int total = sorted.size() + 1;
+        sb.append("const int SO_LUONG_TRAM = ").append(total).append(";\n\n");
 
-        // ----- Struct ToaDoMain ---------------------------------------------
+        // ----- Struct ToaDoMain (2D: chỉ x, y) -----------------------------
         sb.append("struct ToaDoMain {\n")
-          .append("    int id;\n")
-          .append("    const char* name;\n")
           .append("    int x;\n")
           .append("    int y;\n")
-          .append("    const char* mac;\n")
           .append("};\n\n");
 
-        // ----- Array literal ------------------------------------------------
+        // ----- Array literal: cac_tram[] ------------------------------------
         sb.append("ToaDoMain cac_tram[SO_LUONG_TRAM] = {\n");
+        // Index 0: gốc tọa độ
+        sb.append("    {0, 0},                  // Index 0: Không xác định\n");
+        // Index 1..N: trạm thực tế
         if (sorted.isEmpty()) {
-            sb.append("    // (no stations on this map)\n");
+            sb.append("    // (không có trạm nào trên bản đồ này)\n");
         } else {
-            sb.append("    // { id, name, x, y, mac }\n");
-            for (StationDto.Response s : sorted) {
+            for (int i = 0; i < sorted.size(); i++) {
+                StationDto.Response s = sorted.get(i);
+                int index = i + 1;
                 sb.append("    {")
-                  .append(s.getId()).append(", ")
-                  .append(quote(escape(s.getName()))).append(", ")
                   .append(roundToInt(s.getCoordX())).append(", ")
-                  .append(roundToInt(s.getCoordY())).append(", ")
-                  .append(quote(escape(s.getMacAddress())))
-                  .append(" },\n");
+                  .append(roundToInt(s.getCoordY())).append("},   ")
+                  .append("// Trạm ").append(index).append(": ")
+                  .append(escape(s.getName())).append("\n");
             }
         }
-        sb.append("};\n");
+        sb.append("};\n\n");
+
+        // ----- Array literal: ten_tram[] ------------------------------------
+        sb.append("const char *ten_tram[SO_LUONG_TRAM] = {\n");
+        sb.append("    \"Không xác định\"");
+        for (StationDto.Response s : sorted) {
+            sb.append(",\n    ").append(quote(escape(s.getName())));
+        }
+        sb.append("\n};\n");
 
         log.info("Generated C++ config: mapId={} stationCount={} lostCount={}",
                 mapId, sorted.size(), lostCount);

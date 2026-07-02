@@ -42,6 +42,15 @@ export default function MapEditorPage() {
   const canvasRef = useRef(null)
   const dragStationRef = useRef(null)
 
+  // ===== Zoom & Pan state ===================================================
+  // scale: 0.25 .. 5. translate: pixel offset (top-left trước khi scale).
+  const [scale, setScale] = useState(1)
+  const [translate, setTranslate] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const panStartRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
+  const viewportRef = useRef(null)
+  const SPACE_PAN_THRESHOLD = 5 // px — nếu move vượt quá sau khi bấm canvas → pan
+
   // Luôn load cả record đã xóa để dải "Đã xóa gần đây" có dữ liệu
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -75,13 +84,77 @@ export default function MapEditorPage() {
   }, [stations, now])
   const visibleDeletedStations = showDeletedStations ? deletedStations : deletedStations.slice(0, 3)
 
+  // canvasW/canvasH cần dùng trong các handler drag → khai báo trước early-return.
+  const canvasW = map?.width || 240
+  const canvasH = map?.height || 180
+
   const handleCanvasClick = (e) => {
     if (draggingId) return
-    if (e.target !== e.currentTarget && !e.target.closest('[data-marker]')) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const px = e.clientX - rect.left
-    const py = e.clientY - rect.top
-    setPendingCoord({ x: Math.round(px), y: Math.round(py) })
+    if (isPanning) return
+    if (e.target !== e.currentTarget && !e.target.closest('[data-marker]') && !e.target.closest('[data-canvas-bg]')) return
+    const pt = clientToMap(e.clientX, e.clientY)
+    setPendingCoord({ x: Math.round(pt.x), y: Math.round(pt.y) })
+  }
+
+  // Wheel zoom: zoom vào vị trí con trỏ, giữ nguyên tọa độ map-gốc dưới cursor.
+  const handleWheel = (e) => {
+    if (!viewportRef.current) return
+    e.preventDefault()
+    const rect = viewportRef.current.getBoundingClientRect()
+    const cx = e.clientX - rect.left
+    const cy = e.clientY - rect.top
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+    setScale((prev) => {
+      const next = Math.min(5, Math.max(0.25, prev * factor))
+      // bù translate để điểm dưới cursor không "bay"
+      const ratio = next / prev
+      setTranslate((t) => ({ x: cx - (cx - t.x) * ratio, y: cy - (cy - t.y) * ratio }))
+      return next
+    })
+  }
+
+  const zoomIn  = () => setScale((s) => Math.min(5, +(s * 1.25).toFixed(3)))
+  const zoomOut = () => setScale((s) => Math.max(0.25, +(s / 1.25).toFixed(3)))
+  const resetView = () => { setScale(1); setTranslate({ x: 0, y: 0 }) }
+
+  // ===== Pan (chuột giữa, hoặc chuột trái vào vùng nền canvas) =============
+  // Click trái trên nền ảnh (không phải marker) → bắt đầu có thể pan.
+  // Click trái lên marker → drag marker. Click trái không move >5px → tạo station.
+  const onCanvasBgMouseDown = (e) => {
+    if (e.button !== 0) return
+    setIsPanning(false)
+    panStartRef.current = { x: e.clientX, y: e.clientY, tx: translate.x, ty: translate.y }
+  }
+  useEffect(() => {
+    const onMove = (e) => {
+      const ps = panStartRef.current
+      if (!ps || ps.tx === undefined) return
+      const dx = e.clientX - ps.x
+      const dy = e.clientY - ps.y
+      if (!isPanning && (Math.abs(dx) > SPACE_PAN_THRESHOLD || Math.abs(dy) > SPACE_PAN_THRESHOLD)) {
+        setIsPanning(true)
+      }
+      if (isPanning || (Math.abs(dx) > SPACE_PAN_THRESHOLD || Math.abs(dy) > SPACE_PAN_THRESHOLD)) {
+        setTranslate({ x: ps.tx + dx, y: ps.ty + dy })
+      }
+    }
+    const onUp = () => { panStartRef.current = { x: 0, y: 0, tx: undefined, ty: undefined } }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [isPanning])
+
+  /** Chuyển clientX/Y (tương đối với viewport) sang tọa độ trong ảnh gốc. */
+  const clientToMap = (clientX, clientY) => {
+    if (!viewportRef.current) return { x: 0, y: 0 }
+    const rect = viewportRef.current.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    // undo: translate trước, rồi scale
+    return { x: (px - translate.x) / scale, y: (py - translate.y) / scale }
   }
 
   const handleMarkerMouseDown = (e, station) => {
@@ -95,10 +168,9 @@ export default function MapEditorPage() {
       const dx = Math.abs(me.clientX - startX); const dy = Math.abs(me.clientY - startY)
       if (dx > 3 || dy > 3) isDragging.current = true
       if (!isDragging.current) return
-      if (!canvasRef.current) return
-      const rect = canvasRef.current.getBoundingClientRect()
-      const px = Math.max(0, Math.min(rect.width, me.clientX - rect.left))
-      const py = Math.max(0, Math.min(rect.height, me.clientY - rect.top))
+      const pt = clientToMap(me.clientX, me.clientY)
+      const px = Math.max(0, Math.min(canvasW, pt.x))
+      const py = Math.max(0, Math.min(canvasH, pt.y))
       const st = dragStationRef.current
       setStations((prev) => prev.map((s) => s.id === st.id ? { ...s, _displayX: px, _displayY: py } : s))
     }
@@ -106,10 +178,10 @@ export default function MapEditorPage() {
     const onUp = async (me) => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
-      if (isDragging.current && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect()
-        const realX = Math.max(0, Math.min(rect.width, me.clientX - rect.left))
-        const realY = Math.max(0, Math.min(rect.height, me.clientY - rect.top))
+      if (isDragging.current) {
+        const pt = clientToMap(me.clientX, me.clientY)
+        const realX = Math.max(0, Math.min(canvasW, pt.x))
+        const realY = Math.max(0, Math.min(canvasH, pt.y))
         const st = dragStationRef.current
         try {
           await stationApi.update(st.id, {
@@ -146,10 +218,9 @@ export default function MapEditorPage() {
       const dx = Math.abs(t.clientX - startX); const dy = Math.abs(t.clientY - startY)
       if (dx > 3 || dy > 3) isDragging.current = true
       if (!isDragging.current) return
-      if (!canvasRef.current) return
-      const rect = canvasRef.current.getBoundingClientRect()
-      const px = Math.max(0, Math.min(rect.width, t.clientX - rect.left))
-      const py = Math.max(0, Math.min(rect.height, t.clientY - rect.top))
+      const pt = clientToMap(t.clientX, t.clientY)
+      const px = Math.max(0, Math.min(canvasW, pt.x))
+      const py = Math.max(0, Math.min(canvasH, pt.y))
       const st = dragStationRef.current
       setStations((prev) => prev.map((s) => s.id === st.id ? { ...s, _displayX: px, _displayY: py } : s))
     }
@@ -157,11 +228,11 @@ export default function MapEditorPage() {
     const onEnd = async (me) => {
       window.removeEventListener('touchmove', onMove)
       window.removeEventListener('touchend', onEnd)
-      if (isDragging.current && canvasRef.current) {
+      if (isDragging.current) {
         const t = me.changedTouches[0]
-        const rect = canvasRef.current.getBoundingClientRect()
-        const realX = Math.max(0, Math.min(rect.width, t.clientX - rect.left))
-        const realY = Math.max(0, Math.min(rect.height, t.clientY - rect.top))
+        const pt = clientToMap(t.clientX, t.clientY)
+        const realX = Math.max(0, Math.min(canvasW, pt.x))
+        const realY = Math.max(0, Math.min(canvasH, pt.y))
         const st = dragStationRef.current
         try {
           await stationApi.update(st.id, {
@@ -225,9 +296,6 @@ export default function MapEditorPage() {
     )
   }
 
-  const canvasW = map.width || 240
-  const canvasH = map.height || 180
-
   return (
     <div className="flex flex-col h-screen bg-bg">
       {/* Header */}
@@ -274,53 +342,93 @@ export default function MapEditorPage() {
       {/* Body: canvas + sidebar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas */}
-        <div className="flex flex-col flex-1 overflow-auto bg-bg">
-          <div className="flex-1 flex items-center justify-center p-6 relative">
-            <div className="absolute top-4 left-4 text-[10px] font-semibold tracking-widest uppercase text-text-soft bg-bg-soft border border-border px-2 py-1">
-              Click vào ảnh để đặt trạm
+        <div className="flex flex-col flex-1 overflow-hidden bg-bg">
+          <div className="flex-1 relative overflow-hidden">
+            <div className="absolute top-4 left-4 z-10 text-[10px] font-semibold tracking-widest uppercase text-text-soft bg-bg-soft border border-border px-2 py-1 pointer-events-none">
+              Click để vẽ · Scroll để zoom · Kéo nền để pan
             </div>
+
+            {/* Zoom controls */}
+            <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1 bg-bg-soft border border-border-strong shadow-lg">
+              <button
+                onClick={zoomIn}
+                title="Phóng to"
+                className="w-8 h-8 flex items-center justify-center text-text hover:bg-border text-lg leading-none"
+              >+</button>
+              <div className="px-2 py-1 text-[10px] font-mono text-text-soft text-center border-y border-border">
+                {Math.round(scale * 100)}%
+              </div>
+              <button
+                onClick={zoomOut}
+                title="Thu nhỏ"
+                className="w-8 h-8 flex items-center justify-center text-text hover:bg-border text-lg leading-none"
+              >−</button>
+              <button
+                onClick={resetView}
+                title="Đặt lại 100%"
+                className="w-8 h-7 flex items-center justify-center text-text hover:bg-border text-[10px] font-mono border-t border-border"
+              >1:1</button>
+            </div>
+
+            {/* Viewport: nhận wheel + pan background */}
             <div
-              ref={canvasRef}
-              className="relative bg-bg-raised border border-border-strong shadow-2xl"
-              style={{ width: canvasW, height: canvasH }}
-              onClick={handleCanvasClick}
+              ref={viewportRef}
+              onWheel={handleWheel}
+              onMouseDown={onCanvasBgMouseDown}
+              onMouseUp={() => setIsPanning(false)}
+              className="absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing"
+              style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
             >
-              <img
-                ref={imgRef}
-                src={resolveImageUrl(map.imageUrl)}
-                alt={map.name}
-                draggable={false}
-                className="absolute inset-0 w-full h-full select-none pointer-events-none"
-              />
-              {activeStations.map((s) => {
-                const x = s._displayX !== undefined ? s._displayX : s.coordX
-                const y = s._displayY !== undefined ? s._displayY : s.coordY
-                const isDraggingThis = draggingId === s.id
-                return (
-                  <div
-                    key={s.id}
-                    data-marker-container
-                    style={{
-                      position: 'absolute', left: x, top: y,
-                      transform: 'translate(-50%, -50%)',
-                      zIndex: isDraggingThis ? 20 : 10,
-                    }}
-                  >
-                    <div
-                      data-marker
-                      onMouseDown={(e) => handleMarkerMouseDown(e, s)}
-                      onTouchStart={(e) => handleMarkerTouchStart(e, s)}
-                      className="map-marker w-4 h-4 shadow cursor-grab active:cursor-grabbing"
-                      style={{
-                        cursor: isDraggingThis ? 'grabbing' : 'grab',
-                        backgroundColor: 'var(--text-inverted)',
-                        border: `2px solid #94a3b8`,
-                      }}
-                      title={s.name}
-                    />
-                  </div>
-                )
-              })}
+              <div
+                className="absolute top-0 left-0 origin-top-left"
+                style={{
+                  transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+                }}
+              >
+                <div
+                  ref={canvasRef}
+                  data-canvas-bg
+                  className="relative bg-bg-raised border border-border-strong shadow-2xl"
+                  style={{ width: canvasW, height: canvasH }}
+                  onClick={handleCanvasClick}
+                >
+                  <img
+                    ref={imgRef}
+                    src={resolveImageUrl(map.imageUrl)}
+                    alt={map.name}
+                    draggable={false}
+                    className="absolute inset-0 w-full h-full select-none pointer-events-none"
+                  />
+                  {activeStations.map((s) => {
+                    const x = s._displayX !== undefined ? s._displayX : s.coordX
+                    const y = s._displayY !== undefined ? s._displayY : s.coordY
+                    const isDraggingThis = draggingId === s.id
+                    return (
+                      <div
+                        key={s.id}
+                        data-marker-container
+                        style={{
+                          position: 'absolute', left: x, top: y,
+                          zIndex: isDraggingThis ? 20 : 10,
+                        }}
+                      >
+                        <div
+                          data-marker
+                          onMouseDown={(e) => handleMarkerMouseDown(e, s)}
+                          onTouchStart={(e) => handleMarkerTouchStart(e, s)}
+                          className="map-marker w-4 h-4 shadow cursor-grab active:cursor-grabbing"
+                          style={{
+                            cursor: isDraggingThis ? 'grabbing' : 'grab',
+                            backgroundColor: 'var(--text-inverted)',
+                            border: `2px solid #94a3b8`,
+                          }}
+                          title={s.name}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
