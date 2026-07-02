@@ -47,7 +47,7 @@ export default function MapEditorPage() {
   const [scale, setScale] = useState(1)
   const [translate, setTranslate] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
-  const panStartRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
+  const panStartRef = useRef({ x: 0, y: 0, tx: undefined, ty: undefined })
   const viewportRef = useRef(null)
   const SPACE_PAN_THRESHOLD = 5 // px — nếu move vượt quá sau khi bấm canvas → pan
 
@@ -409,6 +409,7 @@ export default function MapEditorPage() {
                         data-marker-container
                         style={{
                           position: 'absolute', left: x, top: y,
+                          transform: 'translate(-50%, -50%)',
                           zIndex: isDraggingThis ? 20 : 10,
                         }}
                       >
