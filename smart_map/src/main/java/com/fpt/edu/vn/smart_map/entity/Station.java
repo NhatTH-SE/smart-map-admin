@@ -33,7 +33,7 @@ public class Station {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "mac_address", nullable = false, length = 50)
+    @Column(name = "mac_address", length = 50)
     private String macAddress;
 
     @Column(name = "coord_x", nullable = false)

@@ -29,7 +29,6 @@ public class StationDto {
         @Size(max = 100, message = "Tên tối đa 100 ký tự")
         private String name;
 
-        @NotBlank(message = "MAC address không được trống")
         @Size(max = 50)
         @Pattern(
                 regexp = "^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$",

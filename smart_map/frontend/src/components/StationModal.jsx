@@ -162,14 +162,17 @@ export default function StationModal({
 
     setSubmitting(true)
     try {
+      // mode minimal (Map Editor): MAC không cần → gửi null.
+      // mode full (Stations Page): bắt buộc MAC + status (đã check ở trên).
+      const mac = isFull ? (macAddress || '').trim().toUpperCase() : null
       const payload = {
         mapId: finalMapId,
         name: name.trim(),
-        macAddress: (macAddress || '').trim().toUpperCase() || '00:00:00:00:00:00',
+        macAddress: mac,
         coordX: finalX,
         coordY: finalY,
-        status,
-        notes: notes.trim() || null,
+        status: isFull ? status : 'ACTIVE',
+        notes: isFull ? (notes.trim() || null) : null,
       }
       if (isEdit) {
         await stationApi.update(station.id, payload)
