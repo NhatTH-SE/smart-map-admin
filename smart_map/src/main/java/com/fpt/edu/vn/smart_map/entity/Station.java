@@ -13,7 +13,7 @@ import java.time.Instant;
  * Mỗi trạm là 1 iTag/Beacon được gắn ở 1 vị trí trên bản đồ.
  */
 @Entity
-@Table(name = "stations", schema = "dbo", uniqueConstraints = @UniqueConstraint(name = "uq_stations_mac", columnNames = "mac_address"))
+@Table(name = "stations", schema = "dbo")
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter

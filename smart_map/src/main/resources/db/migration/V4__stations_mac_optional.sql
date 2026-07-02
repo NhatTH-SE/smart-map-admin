@@ -2,7 +2,15 @@
 -- Map Editor chỉ vẽ dot (không gắn trạm phát vật lý), nên MAC chưa cần tại thời điểm tạo.
 -- Stations Page mới bắt buộc MAC khi gán trạm phát cho dot.
 --
--- Hibernate ddl-auto=update KHÔNG tự sửa NOT NULL → NULL trên column đã tồn tại,
--- nên phải ALTER thủ công. Chạy 1 lần trên môi trường đã có data cũ.
+-- 1. Bỏ UNIQUE constraint trên mac_address.
+--    Lý do: SQL Server UNIQUE INDEX tính NULL = NULL (khác MySQL/PostgreSQL),
+--    không thể có nhiều dot cùng mac=NULL. Map Editor giờ cho phép nhiều dot
+--    chưa gắn MAC, nên cần bỏ UNIQUE.
+--    Check trùng MAC vẫn do application (StationService.create) đảm nhiệm
+--    trên những row có giá trị MAC thực sự.
+--
+-- 2. Cho phép column NULL.
+--    Hibernate ddl-auto=update không tự ALTER nullable → phải ALTER thủ công.
 
+ALTER TABLE dbo.stations DROP CONSTRAINT IF EXISTS uq_stations_mac;
 ALTER TABLE dbo.stations ALTER COLUMN mac_address VARCHAR(50) NULL;
