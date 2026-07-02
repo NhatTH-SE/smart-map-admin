@@ -409,7 +409,7 @@ export default function MapEditorPage() {
                         data-marker-container
                         style={{
                           position: 'absolute', left: x, top: y,
-                          transform: 'translate(-50%, -50%)',
+                          width: 1, height: 1, overflow: 'visible',
                           zIndex: isDraggingThis ? 20 : 10,
                         }}
                       >
@@ -419,6 +419,7 @@ export default function MapEditorPage() {
                           onTouchStart={(e) => handleMarkerTouchStart(e, s)}
                           className="map-marker w-4 h-4 shadow cursor-grab active:cursor-grabbing"
                           style={{
+                            position: 'absolute', left: -8, top: -8,
                             cursor: isDraggingThis ? 'grabbing' : 'grab',
                             backgroundColor: 'var(--text-inverted)',
                             border: `2px solid #94a3b8`,
